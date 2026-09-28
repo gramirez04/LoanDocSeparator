@@ -408,10 +408,11 @@
             };
         }
 
-        function validatePageAccounting(pageCount, pagesData, classifiedLetterCount, classifiedLegalCount, actualLetterPages, actualLegalPages, placeholderCount, finalLetterCount, finalLegalCount) {
+        function validatePageAccounting(pageCount, pagesData, classifiedLetterCount, classifiedLegalCount, actualLetterPages, actualLegalPages, placeholderMode, placeholderCount, finalLetterCount, finalLegalCount) {
             const uniqueOriginalPages = new Set();
             const uniqueLetterOutputPages = new Set();
             const uniqueLegalOutputPages = new Set();
+            const uniquePlaceholderOutputPages = new Set();
             for (const page of pagesData) {
                 if (!Number.isInteger(page.original_page) || page.original_page < 1 || page.original_page > pageCount) {
                     throw new Error(`Page accounting validation failed: Invalid original page reference (${page.original_page}).`);
@@ -431,6 +432,9 @@
                     uniqueLetterOutputPages.add(page.letter_output_page);
                     if (page.legal_output_page !== null) {
                         throw new Error(`Page accounting validation failed: Letter page ${page.original_page} should not have a Legal output page mapping.`);
+                    }
+                    if (page.placeholder_output_page !== null) {
+                        throw new Error(`Page accounting validation failed: Letter page ${page.original_page} should not have a placeholder output page mapping.`);
                     }
                 }
 
@@ -477,6 +481,42 @@
             }
             if (uniqueLegalOutputPages.size !== actualLegalPages) {
                 throw new Error(`Page accounting validation failed: mapped Legal output pages (${uniqueLegalOutputPages.size}) do not match actual Legal pages (${actualLegalPages}).`);
+            }
+
+            for (let i = 0; i < pagesData.length; i++) {
+                const page = pagesData[i];
+                if (page.size !== 'Legal') continue;
+                const hasPlaceholder = page.placeholder_output_page !== null;
+
+                if (placeholderMode === 'None' && hasPlaceholder) {
+                    throw new Error(`Page accounting validation failed: Legal page ${page.original_page} should not have placeholder mapping in mode "${placeholderMode}".`);
+                }
+
+                if (placeholderMode === 'Exact Page Preservation' && !hasPlaceholder) {
+                    throw new Error(`Page accounting validation failed: Legal page ${page.original_page} is missing placeholder mapping in "${placeholderMode}" mode.`);
+                }
+
+                if (placeholderMode === 'One Placeholder Per Legal Section') {
+                    const prev = i > 0 ? pagesData[i - 1] : null;
+                    const isSectionStart = !prev || prev.size !== 'Legal';
+                    if (isSectionStart && !hasPlaceholder) {
+                        throw new Error(`Page accounting validation failed: Legal section starting at original page ${page.original_page} is missing its placeholder mapping.`);
+                    }
+                    if (!isSectionStart && hasPlaceholder) {
+                        throw new Error(`Page accounting validation failed: Legal page ${page.original_page} should not have placeholder mapping because it is not the first page of a Legal section.`);
+                    }
+                }
+
+                if (hasPlaceholder) {
+                    if (uniquePlaceholderOutputPages.has(page.placeholder_output_page)) {
+                        throw new Error(`Page accounting validation failed: Duplicate placeholder output page mapping (${page.placeholder_output_page}).`);
+                    }
+                    uniquePlaceholderOutputPages.add(page.placeholder_output_page);
+                }
+            }
+
+            if (uniquePlaceholderOutputPages.size !== placeholderCount) {
+                throw new Error(`Page accounting validation failed: mapped placeholder pages (${uniquePlaceholderOutputPages.size}) do not match placeholder count (${placeholderCount}).`);
             }
         }
 
@@ -644,6 +684,7 @@
                     legalIndices.length,
                     actualLetterPages,
                     actualLegalPages,
+                    placeholderMode,
                     placeholderCount,
                     letterDoc.getPageCount(),
                     legalDoc.getPageCount()
@@ -826,9 +867,9 @@
 
             function ensureSpace(requiredHeight = 14) {
                 const usableHeight = (pageHeight - bottomMargin) - 50;
-                while (cursorY + requiredHeight > pageHeight - bottomMargin) {
+                const normalizedRequired = Math.min(requiredHeight, usableHeight);
+                while (cursorY + normalizedRequired > pageHeight - bottomMargin) {
                     addPageWithCurrentState();
-                    if (requiredHeight > usableHeight) break;
                 }
             }
 

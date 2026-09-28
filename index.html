@@ -65,8 +65,8 @@
         
         <!-- Top Utility Bar -->
         <div class="bg-slate-50 border-b border-slate-200 px-4 py-3 flex justify-between items-center">
-            <button onclick="downloadApp()" class="text-xs font-bold text-brandBlue hover:text-brandGreen flex items-center transition-colors shadow-sm bg-white border border-slate-200 px-3 py-1.5 rounded-md" title="Download this tool to your computer for permanent offline access">
-                <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+            <button onclick="downloadApp()" class="text-xs font-bold text-brandBlue hover:text-brandGreen flex items-center transition-colors shadow-sm bg-white border border-slate-200 px-3 py-1.5 rounded-md">
+                <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                 Save App to PC
             </button>
             <div id="connectionIndicator" class="transition-all duration-300">
@@ -197,7 +197,7 @@
             <div class="space-y-4">
                 <div>
                     <label class="block text-xs font-bold text-slate-700 mb-1">Beta Password:</label>
-                    <input type="text" id="licenseKeyInput" class="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-brandBlue" placeholder="Enter password...">
+                    <input type="text" id="licenseKeyInput" class="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-brandBlue" placeholder="Enter password here">
                 </div>
                 <p id="hwidDisplay" class="text-xs text-slate-400 font-mono hidden"></p>
                 <button onclick="activateSoftware()" class="w-full py-2 bg-brandBlue hover:bg-brandGreen text-white font-bold rounded shadow transition-colors">
@@ -217,6 +217,7 @@
         const BETA_EXPIRATION_DATE = new Date("2026-10-03T23:59:59"); // Expires Oct 3, 2026
         let hwid = generateMockHWID();
         let isSessionUnlocked = false; // Requires password every time the app opens
+        let currentDownloadUrl = null;
         
         // Trial & Licensing Management
         function generateMockHWID() {
@@ -280,7 +281,7 @@
                 
                 const isMethodExact = document.getElementById('methodExact').checked;
                 if (isMethodExact) {
-                    explanation.innerHTML = "► A blank Letter page will be inserted into the Letter PDF for every single Legal page removed. The Letter PDF page count will match the original file.";
+                    explanation.innerHTML = "► A blank Letter page will be inserted into the Letter PDF for every single Legal page removed. The Letter PDF page count will match the original file count exactly.";
                 } else {
                     explanation.innerHTML = "► A single blank Letter page will be inserted into the Letter PDF just to mark the spot where a continuous group of Legal pages was removed.";
                 }
@@ -353,6 +354,52 @@
             document.getElementById('pdfInput').click();
         }
 
+        function clearPreviousMobileDownload() {
+            if (currentDownloadUrl) {
+                try {
+                    URL.revokeObjectURL(currentDownloadUrl);
+                } catch (e) {
+                    console.warn('Unable to revoke previous blob URL', e);
+                }
+                currentDownloadUrl = null;
+            }
+            const existingDl = document.getElementById('mobileDlBtn');
+            if (existingDl) existingDl.remove();
+        }
+
+        function classifyPageDimensions(width, height) {
+            if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+                return { type: 'Unknown', confidence: 0, ratio: 0, width, height, reason: 'Invalid page dimensions' };
+            }
+
+            const longEdge = Math.max(width, height);
+            const shortEdge = Math.min(width, height);
+            const ratio = longEdge / shortEdge;
+            const letterTarget = 11 / 8.5;
+            const legalTarget = 14 / 8.5;
+
+            const exactLetter = (Math.abs(width - 612) <= 36 && Math.abs(height - 792) <= 36) ||
+                (Math.abs(width - 792) <= 36 && Math.abs(height - 612) <= 36);
+            const exactLegal = (Math.abs(width - 612) <= 36 && Math.abs(height - 1008) <= 36) ||
+                (Math.abs(width - 1008) <= 36 && Math.abs(height - 612) <= 36);
+
+            if (exactLetter) {
+                return { type: 'Letter', confidence: 0.99, ratio, width, height };
+            }
+            if (exactLegal) {
+                return { type: 'Legal', confidence: 0.99, ratio, width, height };
+            }
+
+            const letterDiff = Math.abs(ratio - letterTarget);
+            const legalDiff = Math.abs(ratio - legalTarget);
+
+            if (ratio >= 1.45 || (legalDiff + 0.08) < letterDiff) {
+                return { type: 'Legal', confidence: Math.max(0.66, 1 - (legalDiff / 0.6)), ratio, width, height };
+            }
+
+            return { type: 'Letter', confidence: Math.max(0.66, 1 - (letterDiff / 0.6)), ratio, width, height };
+        }
+
         document.getElementById('pdfInput').addEventListener('change', async function(e) {
             if (e.target.files.length > 0) {
                 const file = e.target.files[0];
@@ -362,10 +409,7 @@
         });
 
         async function startProcessing(file) {
-            // Remove existing download button if doing a second file
-            const existingDl = document.getElementById('mobileDlBtn');
-            if(existingDl) existingDl.remove();
-
+            clearPreviousMobileDownload();
             let pdfJsDoc = null;
             try {
                 setStatus(`Reading ${file.name}...`);
@@ -375,20 +419,16 @@
                 // PHASE 1: TEXT EXTRACTION (PDF.js)
                 // ==========================================
                 setStatus("Phase 1: Analyzing page headers...");
-                
-                // Load PDF for text extraction - sliced buffer prevents detachment crashes
-                pdfJsDoc = await pdfjsLib.getDocument({data: new Uint8Array(arrayBuffer).slice(0)}).promise;
+                pdfJsDoc = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer).slice(0) }).promise;
                 const pageCount = pdfJsDoc.numPages;
                 
-                // Extract all headers sequentially
                 let extractedHeaders = [];
                 for (let i = 1; i <= pageCount; i++) {
                     if (i % 5 === 0) setStatus(`Reading headers: Page ${i} of ${pageCount}...`);
-                    let headerText = await extractHeaderPreview(pdfJsDoc, i);
+                    const headerText = await extractHeaderPreview(pdfJsDoc, i);
                     extractedHeaders.push(headerText);
                 }
                 
-                // CRITICAL MOBILE MEMORY FIX: Destroy PDF.js to free RAM before PDF-lib starts
                 await pdfJsDoc.destroy();
                 pdfJsDoc = null;
                 
@@ -411,70 +451,70 @@
                 let legalIndices = [];
                 let placeholderCount = 0;
                 let prevSize = null;
+                let pageClassifications = [];
 
-                // --- CRITICAL FIX: ASPECT RATIO DETECTION ---
                 for (let i = 0; i < pageCount; i++) {
                     const srcPage = srcDoc.getPage(i);
                     const { width, height } = srcPage.getSize();
-                    
-                    // PDFs can be scanned at huge DPIs (e.g. 2500x3300). Checking raw points (>900) fails.
-                    // Instead, we check the Aspect Ratio (Long Edge / Short Edge).
-                    // Letter (11/8.5) = 1.29. Legal (14/8.5) = 1.64.
-                    const longEdge = Math.max(width, height);
-                    const shortEdge = Math.min(width, height);
-                    const aspectRatio = longEdge / shortEdge;
-                    
-                    // Threshold of 1.45 cleanly separates Letter from Legal regardless of scale/DPI
-                    const isLegal = aspectRatio > 1.45;
-                    
+                    const pageClass = classifyPageDimensions(width, height);
+                    pageClassifications.push(pageClass);
+
+                    const isLegal = pageClass.type === 'Legal';
                     if (isLegal) legalIndices.push(i);
                     else letterIndices.push(i);
                 }
 
-                // ==========================================
-                // PHASE 3: BATCH ASSEMBLY (100x Faster)
-                // ==========================================
-                setStatus("Phase 3: Assembling new documents...");
-                
-                // Copy all pages in massive batches to prevent mobile thread blocking
+                // Copy pages in batches to reduce UI blocking while keeping memory usage controlled.
                 let copiedLetterPages = [];
                 if (letterIndices.length > 0) {
-                     copiedLetterPages = await letterDoc.copyPages(srcDoc, letterIndices);
+                    copiedLetterPages = await letterDoc.copyPages(srcDoc, letterIndices);
                 }
                 
                 let copiedLegalPages = [];
                 if (legalIndices.length > 0) {
-                     copiedLegalPages = await legalDoc.copyPages(srcDoc, legalIndices);
+                    copiedLegalPages = await legalDoc.copyPages(srcDoc, legalIndices);
                 }
 
                 let actualLetterPages = 0;
                 let actualLegalPages = 0;
                 let letterDocIndex = 0;
                 let legalDocIndex = 0;
-                
+                let letterOutputPage = 0;
+                let legalOutputPage = 0;
+
                 for (let i = 0; i < pageCount; i++) {
                     const pageNum = i + 1;
-                    const isLegal = legalIndices.includes(i);
-                    const sizeStr = isLegal ? "Legal" : "Letter";
+                    const pageClass = pageClassifications[i];
+                    const sizeStr = pageClass.type === 'Legal' ? 'Legal' : 'Letter';
                     
                     let newLegalNum = null;
-                    if (isLegal) {
+                    let newLetterNum = null;
+
+                    if (pageClass.type === 'Legal') {
                         actualLegalPages++;
-                        newLegalNum = actualLegalPages;
+                        legalOutputPage++;
+                        newLegalNum = legalOutputPage;
+
                         legalDoc.addPage(copiedLegalPages[legalDocIndex]);
                         legalDocIndex++;
                         
                         if (placeholderMode === "Exact Page Preservation") {
                             letterDoc.addPage([612, 792]);
+                            letterOutputPage++;
+                            newLetterNum = letterOutputPage;
                             placeholderCount++;
                         } else if (placeholderMode === "One Placeholder Per Legal Section") {
                             if (prevSize !== "Legal") {
                                 letterDoc.addPage([612, 792]);
+                                letterOutputPage++;
+                                newLetterNum = letterOutputPage;
                                 placeholderCount++;
                             }
                         }
                     } else {
                         actualLetterPages++;
+                        letterOutputPage++;
+                        newLetterNum = letterOutputPage;
                         letterDoc.addPage(copiedLetterPages[letterDocIndex]);
                         letterDocIndex++;
                     }
@@ -482,8 +522,14 @@
                     pagesData.push({
                         original_page: pageNum,
                         size: sizeStr,
-                        preview_text: extractedHeaders[i],
-                        new_legal_page: newLegalNum
+                        preview_text: extractedHeaders[i] || '[No identifying header found]',
+                        new_legal_page: newLegalNum,
+                        letter_output_page: newLetterNum,
+                        legal_output_page: newLegalNum,
+                        aspect_ratio: pageClass.ratio,
+                        confidence: pageClass.confidence,
+                        width: pageClass.width,
+                        height: pageClass.height
                     });
                     
                     prevSize = sizeStr;
@@ -511,15 +557,14 @@
                 
                 zip.file("3_Reassembly_Guide.pdf", reportBlob);
                 
-                const zipBlob = await zip.generateAsync({type: "blob"});
-                const timestamp = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14);
-                const baseName = file.name.replace(/\.[^/.]+$/, "");
+                const zipBlob = await zip.generateAsync({ type: 'blob' });
+                const timestamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
+                const baseName = file.name.replace(/\.[^/.]+$/, '');
                 const fileName = `${baseName}_Processed_${timestamp}.zip`;
                 
-                // --- CRITICAL FIX: IOS SAFARI DOWNLOAD TIMEOUT ---
-                // Safari blocks auto-downloads if the script takes too long. 
-                // We create a massive, visible download button to provide a fresh user click.
+                // Safari and mobile browsers can block forced downloads, so provide a visible click target.
                 const blobUrl = URL.createObjectURL(zipBlob);
+                currentDownloadUrl = blobUrl;
                 const actionContainer = document.getElementById('processBtn').parentElement;
                 
                 const dlButtonHtml = `
@@ -532,16 +577,14 @@
                 tempDiv.innerHTML = dlButtonHtml;
                 actionContainer.appendChild(tempDiv.firstElementChild);
 
-                // Still attempt the auto-download for PC users
-                try { saveAs(zipBlob, fileName); } catch(e) { console.warn("Auto-download suppressed."); }
-                
-                setStatus("Success! Tap the green button above to save.", false, true);
+                try { saveAs(zipBlob, fileName); } catch (e) { console.warn('Auto-download suppressed.', e); }
+                setStatus('Success! Tap the green button above to save.', false, true);
 
             } catch (err) {
                 console.error(err);
-                if (pdfJsDoc) await pdfJsDoc.destroy().catch(e => console.log(e)); 
-                setStatus("An error occurred during processing.", true);
-                alert("Error: " + err.message);
+                if (pdfJsDoc) await pdfJsDoc.destroy().catch(e => console.log(e));
+                setStatus('An error occurred during processing.', true);
+                alert('Error: ' + err.message);
             }
         }
 
@@ -550,43 +593,37 @@
                 const page = await pdfJsDoc.getPage(pageNum);
                 const textContent = await page.getTextContent();
                 
-                if (!textContent.items || textContent.items.length === 0) return "[Image Only / Blank Page]";
+                if (!textContent.items || textContent.items.length === 0) return '[Image Only / Blank Page]';
                 
-                // --- CRITICAL FIX: MOBILE TEXT RECONSTRUCTION ---
-                // Groups letters by vertical position and font size to combat iOS coordinate flipping
                 let lines = {};
-                let maxFontSizeOverall = 0;
-
                 for (let item of textContent.items) {
-                    if (!item.str.trim()) continue;
-                    
-                    const fontSize = Math.round(item.transform[0] || item.height || 0);
-                    // Round Y to nearest 10 to group wandering letters on the same visual line
-                    const y = Math.round(item.transform[5] / 10) * 10; 
-                    
-                    const key = `${y}_${fontSize}`;
-                    if (!lines[key]) lines[key] = { text: [], fontSize: fontSize };
-                    
-                    lines[key].text.push({ str: item.str, x: item.transform[4] });
+                    if (!item || !item.str || !item.str.trim()) continue;
+                    if (!item.transform || item.transform.length < 6) continue;
+
+                    const fontSize = Number(item.transform[0]) || Number(item.height) || 0;
+                    const x = Number(item.transform[4]) || 0;
+                    const y = Math.round(Number(item.transform[5]) / 10) * 10;
+                    const key = `${y}_${Math.round(fontSize)}`;
+
+                    if (!lines[key]) lines[key] = { text: [], fontSize: Math.round(fontSize) };
+                    lines[key].text.push({ str: item.str, x });
                 }
 
-                let bestText = "";
+                let bestText = '';
                 let maxScore = -1;
 
-                // Find the line with the absolute largest font
                 for (let key in lines) {
                     let line = lines[key];
-                    
-                    // Sort characters left-to-right to fix scrambled words
                     line.text.sort((a, b) => a.x - b.x);
                     
-                    // Smart stitch: Add spaces only if distance between letters is large
-                    let stitched = "";
-                    for(let i=0; i<line.text.length; i++) {
+                    let stitched = '';
+                    for (let i = 0; i < line.text.length; i++) {
                         stitched += line.text[i].str;
-                        if(i < line.text.length - 1) {
-                            let dist = line.text[i+1].x - (line.text[i].x + (line.fontSize * 0.5));
-                            if(dist > line.fontSize * 0.2) stitched += " ";
+                        if (i < line.text.length - 1) {
+                            const nextX = line.text[i + 1].x;
+                            const currentX = line.text[i].x;
+                            const estimatedGap = nextX - (currentX + (line.fontSize * 0.5));
+                            if (estimatedGap > line.fontSize * 0.2) stitched += ' ';
                         }
                     }
                     stitched = stitched.replace(/\s+/g, ' ').trim();
@@ -599,15 +636,15 @@
                     }
                 }
 
-                return bestText ? bestText.substring(0, 85) : "[No identifying header found]";
+                return bestText ? bestText.substring(0, 85) : '[No identifying header found]';
             } catch (e) {
-                console.warn("Header Extraction Skipped:", e);
-                return "[Error reading text]";
+                console.warn('Header Extraction Skipped:', e);
+                return '[Error reading text]';
             }
         }
 
         function groupLegalPages(pagesData) {
-            const legalPages = pagesData.filter(p => p.size === "Legal");
+            const legalPages = pagesData.filter(p => p.size === 'Legal');
             if (legalPages.length === 0) return [];
 
             let groups = [];
@@ -632,48 +669,44 @@
             const marginX = 40;
             let cursorY = 50;
 
-            // Title
-            doc.setFont("helvetica", "bold");
+            doc.setFont('helvetica', 'bold');
             doc.setFontSize(18);
-            doc.text("REASSEMBLY GUIDE", doc.internal.pageSize.width/2, cursorY, { align: "center" });
+            doc.text('REASSEMBLY GUIDE', doc.internal.pageSize.width/2, cursorY, { align: 'center' });
             cursorY += 20;
 
-            // Subtitle
-            doc.setFont("helvetica", "italic");
+            doc.setFont('helvetica', 'italic');
             doc.setFontSize(10);
-            doc.text("This guide is an optional convenience feature intended for users who need to reconstruct", doc.internal.pageSize.width/2, cursorY, { align: "center" });
+            doc.text('This guide is an optional convenience feature intended for users who need to reconstruct', doc.internal.pageSize.width/2, cursorY, { align: 'center' });
             cursorY += 14;
-            doc.text("the original document sequence after processing.", doc.internal.pageSize.width/2, cursorY, { align: "center" });
+            doc.text('the original document sequence after processing.', doc.internal.pageSize.width/2, cursorY, { align: 'center' });
             cursorY += 30;
 
-            // NEW: Step-by-step instructions
-            doc.setFont("helvetica", "bold");
+            doc.setFont('helvetica', 'bold');
             doc.setFontSize(14);
-            doc.text("HOW TO REASSEMBLE YOUR PACKAGE", marginX, cursorY);
+            doc.text('HOW TO REASSEMBLE YOUR PACKAGE', marginX, cursorY);
             cursorY += 20;
 
-            doc.setFont("helvetica", "normal");
+            doc.setFont('helvetica', 'normal');
             doc.setFontSize(10);
             doc.text("Step 1: Print the '1_Letter_Pages.pdf' file on standard Letter (8.5 x 11) paper.", marginX, cursorY); cursorY += 16;
             doc.text("Step 2: Print the '2_Legal_Pages.pdf' file on Legal (8.5 x 14) paper.", marginX, cursorY); cursorY += 16;
             
-            if (pMode === "None") {
-                doc.text("Step 3: Use the checklist below to insert your newly printed Legal pages into the Letter stack.", marginX, cursorY); cursorY += 25;
-            } else if (pMode === "Exact Page Preservation") {
-                doc.text("Step 3: Your Letter stack contains blank placeholder pages where Legal pages belong.", marginX, cursorY); cursorY += 14;
-                doc.text("        Use the checklist below to swap the blank pages with your printed Legal pages.", marginX, cursorY); cursorY += 25;
+            if (pMode === 'None') {
+                doc.text('Step 3: Use the checklist below to insert your newly printed Legal pages into the Letter stack.', marginX, cursorY); cursorY += 25;
+            } else if (pMode === 'Exact Page Preservation') {
+                doc.text('Step 3: Your Letter stack contains blank placeholder pages where Legal pages belong.', marginX, cursorY); cursorY += 14;
+                doc.text('        Use the checklist below to swap the blank pages with your printed Legal pages.', marginX, cursorY); cursorY += 25;
             } else {
-                doc.text("Step 3: Your Letter stack contains blank marker pages indicating Legal sections.", marginX, cursorY); cursorY += 14;
-                doc.text("        Use the checklist below to replace those blank markers with your printed Legal pages.", marginX, cursorY); cursorY += 25;
+                doc.text('Step 3: Your Letter stack contains blank marker pages indicating Legal sections.', marginX, cursorY); cursorY += 14;
+                doc.text('        Use the checklist below to replace those blank markers with your printed Legal pages.', marginX, cursorY); cursorY += 25;
             }
 
-            // Summary section
-            doc.setFont("helvetica", "bold");
+            doc.setFont('helvetica', 'bold');
             doc.setFontSize(14);
-            doc.text("PACKAGE SUMMARY", marginX, cursorY);
+            doc.text('PACKAGE SUMMARY', marginX, cursorY);
             cursorY += 20;
             
-            doc.setFont("helvetica", "normal");
+            doc.setFont('helvetica', 'normal');
             doc.setFontSize(10);
             doc.text(`File Name: ${filename}`, marginX, cursorY); cursorY += 14;
             doc.text(`Original Pages: ${origCount}`, marginX, cursorY); cursorY += 20;
@@ -685,29 +718,27 @@
             doc.text(`Placeholder Pages Added: ${pCount}`, marginX, cursorY); cursorY += 14;
             doc.text(`Final Letter PDF Pages: ${finalLetterCount}`, marginX, cursorY); cursorY += 30;
 
-            // Disclaimer
-            doc.setFont("helvetica", "bold");
+            doc.setFont('helvetica', 'bold');
             doc.setFontSize(14);
-            doc.text("IMPORTANT DISCLAIMER", marginX, cursorY); cursorY += 15;
+            doc.text('IMPORTANT DISCLAIMER', marginX, cursorY); cursorY += 15;
             
             doc.setTextColor(255, 0, 0);
             doc.setFontSize(10);
-            const disclaimerText = "The document header shown below is provided only as a reference. ALWAYS use the Original Page Number and 'Insert After' Number as the authoritative instruction.";
+            const disclaimerText = "The document header shown below is provided only as a reference. ALWAYS use the Original Page Number and 'Insert After' Number as the authoritative instruction for reassembly. The placeholder pages are only there to preserve position.";
             const splitDisclaimer = doc.splitTextToSize(disclaimerText, doc.internal.pageSize.width - (marginX * 2));
             doc.text(splitDisclaimer, marginX, cursorY);
             cursorY += (splitDisclaimer.length * 12) + 15;
             doc.setTextColor(0, 0, 0);
 
-            // Checklist Section
-            doc.setFont("helvetica", "bold");
+            doc.setFont('helvetica', 'bold');
             doc.setFontSize(14);
-            doc.text("QUICK REASSEMBLY CHECKLIST", marginX, cursorY); cursorY += 20;
+            doc.text('QUICK REASSEMBLY CHECKLIST', marginX, cursorY); cursorY += 20;
 
-            doc.setFont("helvetica", "normal");
+            doc.setFont('helvetica', 'normal');
             doc.setFontSize(10);
             
             if (legalGroups.length === 0) {
-                doc.text("No legal pages found in this document.", marginX, cursorY);
+                doc.text('No legal pages found in this document.', marginX, cursorY);
             } else {
                 for (let group of legalGroups) {
                     if (cursorY > doc.internal.pageSize.height - 100) {
@@ -720,58 +751,56 @@
                     const newStart = group[0].new_legal_page;
                     const newEnd = group[group.length-1].new_legal_page;
                     
-                    // Find the preceding Letter page for accurate physical instructions
                     let precedingLetterPage = null;
                     for (let i = startPage - 1; i >= 1; i--) {
                         const candidate = pagesData.find(p => p.original_page === i);
-                        if (candidate && candidate.size === "Letter") {
+                        if (candidate && candidate.size === 'Letter') {
                             precedingLetterPage = candidate;
                             break;
                         }
                     }
                     
                     const insertAfter = precedingLetterPage ? precedingLetterPage.original_page : 0;
-                    const precedingText = precedingLetterPage ? precedingLetterPage.preview_text : "Start of Document";
+                    const precedingLetterOutputPage = precedingLetterPage ? precedingLetterPage.letter_output_page : 0;
+                    const precedingText = precedingLetterPage ? precedingLetterPage.preview_text : 'Start of Document';
 
-                    let l1 = "";
+                    let l1 = '';
                     if (startPage === endPage) {
                         l1 = `[ ] Printed Legal Page: ${newStart} (Original PDF Page #${startPage})`;
                     } else {
                         l1 = `[ ] Printed Legal Pages: ${newStart} to ${newEnd} (Original PDF Pages #${startPage}-${endPage})`;
                     }
                     
-                    doc.setFont("helvetica", "bold");
+                    doc.setFont('helvetica', 'bold');
                     doc.text(l1, marginX, cursorY); cursorY += 12;
                     
-                    doc.setFont("helvetica", "normal");
+                    doc.setFont('helvetica', 'normal');
                     if (insertAfter === 0) {
-                        doc.text(`     Place at the very beginning of the document stack.`, marginX, cursorY); cursorY += 12;
+                        doc.text('     Place at the very beginning of the document stack.', marginX, cursorY); cursorY += 12;
                     } else {
-                        doc.text(`     Insert after Original PDF Page ${insertAfter} (Check the footer page numbers).`, marginX, cursorY); cursorY += 12;
+                        doc.text(`     Insert after Original PDF Page ${insertAfter} (Letter output page ${precedingLetterOutputPage}).`, marginX, cursorY); cursorY += 12;
                         
-                        doc.setFont("helvetica", "italic");
+                        doc.setFont('helvetica', 'italic');
                         doc.setTextColor(100, 100, 100);
-                        const ptSplit = doc.splitTextToSize(`     Look for this text at the top of that page: "${precedingText}"`, doc.internal.pageSize.width - (marginX * 2) - 20);
+                        const ptSplit = doc.splitTextToSize(`     Header reference at the top of that page: "${precedingText}"`, doc.internal.pageSize.width - (marginX * 2) - 20);
                         doc.text(ptSplit, marginX, cursorY);
                         cursorY += (ptSplit.length * 12) + 8;
                         doc.setTextColor(0, 0, 0);
                     }
-                    cursorY += 8; // Extra padding between checklist items
+                    cursorY += 8;
                 }
             }
 
-            // Advanced Table
             if (legalGroups.length > 0) {
-                cursorY += 20; // Add some padding below the checklist
-                // Only add a new page if we are too close to the bottom
+                cursorY += 20;
                 if (cursorY > doc.internal.pageSize.height - 150) {
                     doc.addPage();
                     cursorY = 50;
                 }
                 
-                doc.setFont("helvetica", "bold");
+                doc.setFont('helvetica', 'bold');
                 doc.setFontSize(14);
-                doc.text("ADVANCED REASSEMBLY VIEW", marginX, cursorY); cursorY += 15;
+                doc.text('ADVANCED REASSEMBLY VIEW', marginX, cursorY); cursorY += 15;
                 
                 const tableData = [];
                 for (let group of legalGroups) {
@@ -780,38 +809,40 @@
                     const newStart = group[0].new_legal_page;
                     const newEnd = group[group.length-1].new_legal_page;
                     
-                    // Find the preceding Letter page
                     let precedingLetterPage = null;
                     for (let i = startPage - 1; i >= 1; i--) {
                         const candidate = pagesData.find(p => p.original_page === i);
-                        if (candidate && candidate.size === "Letter") {
+                        if (candidate && candidate.size === 'Letter') {
                             precedingLetterPage = candidate;
                             break;
                         }
                     }
                     
                     const insertAfter = precedingLetterPage ? precedingLetterPage.original_page : 0;
-                    const precedingText = precedingLetterPage ? precedingLetterPage.preview_text : "Start of Document";
+                    const precedingLetterOutputPage = precedingLetterPage ? precedingLetterPage.letter_output_page : 0;
+                    const precedingText = precedingLetterPage ? precedingLetterPage.preview_text : 'Start of Document';
                     
                     const origLabel = startPage === endPage ? `${startPage}` : `${startPage}-${endPage}`;
                     const newLabel = newStart === newEnd ? `${newStart}` : `${newStart}-${newEnd}`;
-                    const afterLabel = insertAfter === 0 ? "Start of Doc" : `${insertAfter}`;
+                    const afterLabel = insertAfter === 0 ? 'Start of Doc' : `${insertAfter}`;
+                    const letterAfterLabel = precedingLetterOutputPage === 0 ? 'Start of Letter stack' : `${precedingLetterOutputPage}`;
                     
-                    tableData.push([newLabel, origLabel, afterLabel, precedingText]);
+                    tableData.push([newLabel, origLabel, afterLabel, letterAfterLabel, precedingText]);
                 }
 
                 doc.autoTable({
                     startY: cursorY,
-                    head: [['Printed Legal Page(s)', 'Original PDF Page(s)', 'Insert After\n(Original Pg #)', 'Detected Preceding Document Header']],
+                    head: [['Printed Legal Page(s)', 'Original PDF Page(s)', 'Insert After\n(Original Pg #)', 'Insert After\n(Letter Output Pg #)', 'Detected Preceding Document Header']],
                     body: tableData,
                     theme: 'grid',
-                    styles: { fontSize: 9, font: 'helvetica', valign: 'middle' },
+                    styles: { fontSize: 8, font: 'helvetica', valign: 'middle' },
                     headStyles: { fillColor: [200, 200, 200], textColor: [0, 0, 0], fontStyle: 'bold', halign: 'center' },
-                    columnStyles: { 
-                        0: { halign: 'center', cellWidth: 80 },
-                        1: { halign: 'center', cellWidth: 80 },
-                        2: { halign: 'center', cellWidth: 80 },
-                        3: { halign: 'left' }
+                    columnStyles: {
+                        0: { halign: 'center', cellWidth: 68 },
+                        1: { halign: 'center', cellWidth: 68 },
+                        2: { halign: 'center', cellWidth: 68 },
+                        3: { halign: 'center', cellWidth: 68 },
+                        4: { halign: 'left' }
                     }
                 });
             }
@@ -823,7 +854,8 @@
         document.addEventListener('DOMContentLoaded', () => {
             updateUIState();
             checkLicensingState();
-            initConnectionGuard();        });
+            initConnectionGuard();
+        });
 
         // --- Connection Guard Logic ---
         function initConnectionGuard() {
@@ -837,28 +869,23 @@
             if (navigator.onLine) {
                 indicator.innerHTML = '<span class="w-2 h-2 rounded-full bg-blue-500 mr-1.5 animate-pulse"></span><span class="text-blue-700 tracking-tight">🌐 Online (Data Stays Local)</span>';
                 indicator.className = 'flex items-center px-3 py-1.5 rounded-full text-[10px] uppercase font-bold shadow-sm transition-all duration-300 bg-blue-50 border border-blue-200 cursor-help';
-                indicator.title = "All file processing occurs strictly on your local device. No data is ever transmitted. You may disconnect your internet and continue processing offline.";
+                indicator.title = 'All file processing occurs strictly on your local device. No data is ever transmitted. You may disconnect your internet and continue processing offline.';
             } else {
                 indicator.innerHTML = '<span class="w-2 h-2 rounded-full bg-brandGreen mr-1.5"></span><span class="text-brandGreen tracking-tight">🔒 Offline (Ready)</span>';
                 indicator.className = 'flex items-center px-3 py-1.5 rounded-full text-[10px] uppercase font-bold shadow-sm transition-all duration-300 bg-green-50 border border-green-200 cursor-help';
-                indicator.title = "Disconnected from the internet. The app is safely running entirely offline on your device.";
+                indicator.title = 'Disconnected from the internet. The app is safely running entirely offline on your device.';
             }
         }
 
         function downloadApp() {
             try {
-                // Get the current HTML structure directly from the browser's memory
-                const htmlContent = "<!DOCTYPE html>\n" + document.documentElement.outerHTML;
+                const htmlContent = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
                 const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
-                
-                // Force the download directly to the user's computer
                 saveAs(blob, 'LoanDocSeparator_Offline_Tool.html');
             } catch (e) {
-                // Absolute fallback (extremely rare)
-                alert("To save this app to your computer, press Ctrl+S (Windows) or Cmd+S (Mac) on your keyboard and save it to your Desktop.");
+                alert('To save this app to your computer, press Ctrl+S (Windows) or Cmd+S (Mac) on your keyboard and save it to your Desktop.');
             }
         }
-
     </script>
 </body>
 </html>

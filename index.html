@@ -59,17 +59,17 @@
         .modal.active { display: flex; align-items: center; justify-content: center; }
     </style>
 </head>
-<body class="min-h-screen flex flex-col items-center py-6 sm:py-10 px-3 sm:px-4 text-slate-800 overflow-x-hidden">
+<body class="min-h-screen flex flex-col items-center py-10 px-4 text-slate-800">
 
     <div class="w-full max-w-xl bg-white rounded-lg shadow-lg border border-slate-200 overflow-hidden relative">
         
         <!-- Top Utility Bar -->
-        <div class="bg-slate-50 border-b border-slate-200 px-4 py-3 flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center">
-            <button onclick="downloadApp()" class="min-h-[44px] text-xs font-bold text-brandBlue hover:text-brandGreen flex items-center justify-center transition-colors shadow-sm bg-white border border-slate-200 px-3 py-1.5 rounded">
-                <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+        <div class="bg-slate-50 border-b border-slate-200 px-4 py-3 flex justify-between items-center">
+            <button onclick="downloadApp()" class="text-xs font-bold text-brandBlue hover:text-brandGreen flex items-center transition-colors shadow-sm bg-white border border-slate-200 px-3 py-1.5 rounded-md">
+                <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                 Save App to PC
             </button>
-            <div id="connectionIndicator" class="transition-all duration-300 w-full sm:w-auto flex justify-center">
+            <div id="connectionIndicator" class="transition-all duration-300">
                 <!-- Populated by JS -->
             </div>
         </div>
@@ -77,10 +77,10 @@
         <!-- Header -->
         <div class="text-center pt-6 pb-4">
             <!-- Main Title -->
-            <div class="flex justify-center items-baseline space-x-0 tracking-tight flex-wrap">
-                <h1 class="text-3xl sm:text-4xl font-extrabold text-brandGreen m-0 p-0">Loan</h1>
-                <h1 class="text-3xl sm:text-4xl font-extrabold text-brandBlue m-0 p-0">Doc</h1>
-                <h1 class="text-3xl sm:text-4xl font-extrabold text-brandGreen m-0 p-0">Separator</h1>
+            <div class="flex justify-center items-baseline space-x-0 tracking-tight">
+                <h1 class="text-4xl font-extrabold text-brandGreen m-0 p-0">Loan</h1>
+                <h1 class="text-4xl font-extrabold text-brandBlue m-0 p-0">Doc</h1>
+                <h1 class="text-4xl font-extrabold text-brandGreen m-0 p-0">Separator</h1>
             </div>
             
             <!-- Subtitle -->
@@ -94,11 +94,6 @@
                 <div class="h-px bg-brandGreen w-12"></div>
             </div>
 
-            <!-- Version Timestamp -->
-            <div id="versionTimestamp" class="text-center mt-2 text-[10px] sm:text-[11px] text-slate-400 font-medium tracking-wide">
-                <span id="lastUpdated">Last updated: Loading...</span>
-            </div>
-
             <!-- Tagline -->
             <div class="flex justify-center items-center space-x-2 mt-3 text-[10px] sm:text-xs font-bold tracking-widest uppercase">
                 <span class="text-brandGreen">Organize.</span>
@@ -107,27 +102,28 @@
                 <span class="text-slate-400">|</span>
                 <span class="text-slate-600">Assemble.</span>
             </div>
+            <p id="appVersionLabel" class="mt-2 text-[11px] font-semibold text-slate-500"></p>
         </div>
 
         <!-- License Status Bar -->
-        <div id="licenseBar" class="w-full text-center min-h-[44px] py-2 px-4 text-sm font-bold cursor-pointer transition-colors flex items-center justify-center" onclick="openActivationModal()">
+        <div id="licenseBar" class="w-full text-center py-2 px-4 text-sm font-bold cursor-pointer transition-colors" onclick="openActivationModal()">
             Loading access status...
         </div>
 
         <div class="h-1 w-full bg-brandBlue"></div>
 
         <!-- Main Card Content -->
-        <div class="p-4 sm:p-8">
+        <div class="p-6 sm:p-8">
             <h2 class="text-lg font-bold text-slate-800 mb-2">PAGE POSITION PRESERVATION</h2>
             <p class="text-sm text-slate-600 mb-4">Preserve positions of removed Legal pages?</p>
 
             <!-- Preserve Options -->
             <div class="space-y-2 mb-4">
-                <label class="flex items-center space-x-3 cursor-pointer min-h-[44px]" for="preserveNo">
+                <label class="flex items-center space-x-3 cursor-pointer" for="preserveNo">
                     <input type="radio" id="preserveNo" name="preserve" value="No" class="form-radio h-4 w-4 text-brandBlue" checked onchange="updateUIState()">
                     <span class="text-sm text-slate-700">No (Default)</span>
                 </label>
-                <label class="flex items-center space-x-3 cursor-pointer min-h-[44px]" for="preserveYes">
+                <label class="flex items-center space-x-3 cursor-pointer" for="preserveYes">
                     <input type="radio" id="preserveYes" name="preserve" value="Yes" class="form-radio h-4 w-4 text-brandBlue" onchange="updateUIState()">
                     <span class="text-sm text-slate-700">Yes</span>
                 </label>
@@ -137,11 +133,11 @@
             <div id="method-container" class="ml-6 pl-4 border-l-2 border-slate-200 opacity-50 pointer-events-none transition-opacity">
                 <p class="text-xs font-bold text-slate-800 mb-2">Placeholder Insertion Method:</p>
                 <div class="space-y-2">
-                    <label class="flex items-center space-x-3 cursor-pointer min-h-[44px]" for="methodExact">
+                    <label class="flex items-center space-x-3 cursor-pointer" for="methodExact">
                         <input type="radio" id="methodExact" name="method" value="Exact Page Preservation" class="form-radio h-4 w-4 text-brandBlue" checked onchange="updateUIState()">
                         <span class="text-sm text-slate-700">Exact Page Preservation</span>
                     </label>
-                    <label class="flex items-center space-x-3 cursor-pointer min-h-[44px]" for="methodSection">
+                    <label class="flex items-center space-x-3 cursor-pointer" for="methodSection">
                         <input type="radio" id="methodSection" name="method" value="One Placeholder Per Legal Section" class="form-radio h-4 w-4 text-brandBlue" onchange="updateUIState()">
                         <span class="text-sm text-slate-700">One Placeholder Per Legal Section</span>
                     </label>
@@ -157,8 +153,8 @@
 
             <!-- Action Button -->
             <div class="mt-8 text-center">
-                <input type="file" id="pdfInput" accept="application/pdf,.pdf" style="position:absolute;width:0;height:0;opacity:0;overflow:hidden;" aria-hidden="true">
-                <button id="processBtn" class="w-full sm:w-auto min-h-[44px] px-8 py-3 bg-brandBlue hover:bg-brandGreen text-white font-bold rounded shadow-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed" onclick="triggerFileSelect()">
+                <input type="file" id="pdfInput" accept="application/pdf" class="hidden">
+                <button id="processBtn" class="w-full sm:w-auto px-8 py-3 bg-brandBlue hover:bg-brandGreen text-white font-bold rounded shadow-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed" onclick="triggerFileSelect()">
                     Select & Process PDF
                 </button>
                 <p class="mt-3 text-xs text-slate-500 font-medium">
@@ -170,20 +166,13 @@
             <div class="text-center mt-4">
                 <p id="statusLabel" class="text-sm text-slate-500 font-medium h-5">Ready</p>
             </div>
-            <!-- Diagnostic Log (visible on mobile so users can see what happened) -->
-            <div id="diagnosticLog" class="mt-4 hidden">
-                <div class="bg-slate-50 border border-slate-200 rounded p-3 max-h-56 overflow-y-auto text-left">
-                    <p class="text-xs font-bold text-slate-700 mb-1">Processing Details:</p>
-                    <div id="diagnosticContent" class="text-[11px] text-slate-600 font-mono space-y-0.5"></div>
-                </div>
-            </div>
         </div>
     </div>
 
     <!-- Activation Modal -->
     <div id="activationModal" class="modal">
         <div class="bg-white rounded-lg shadow-xl border border-slate-200 w-full max-w-md p-6 relative">
-            <button onclick="closeActivationModal()" class="absolute top-3 right-3 w-11 h-11 flex items-center justify-center text-slate-400 hover:text-slate-600">
+            <button onclick="closeActivationModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
                 <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
             
@@ -209,10 +198,10 @@
             <div class="space-y-4">
                 <div>
                     <label class="block text-xs font-bold text-slate-700 mb-1">Beta Password:</label>
-                    <input type="text" id="licenseKeyInput" class="w-full min-h-[44px] px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-brandBlue" placeholder="Enter password">
+                    <input type="text" id="licenseKeyInput" class="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-brandBlue" placeholder="Enter password here">
                 </div>
                 <p id="hwidDisplay" class="text-xs text-slate-400 font-mono hidden"></p>
-                <button onclick="activateSoftware()" class="w-full min-h-[44px] py-2 bg-brandBlue hover:bg-brandGreen text-white font-bold rounded shadow transition-colors">
+                <button onclick="activateSoftware()" class="w-full py-2 bg-brandBlue hover:bg-brandGreen text-white font-bold rounded shadow transition-colors">
                     Unlock App
                 </button>
             </div>
@@ -227,10 +216,10 @@
         const ADMIN_MASTER_KEY = "SL-ADMIN-GERMAN-2026";
         const BETA_PASSWORD = "SLTRIAL";
         const BETA_EXPIRATION_DATE = new Date("2026-10-03T23:59:59"); // Expires Oct 3, 2026
+        const APP_BUILD_VERSION = "2026-09-28 05:58 UTC";
         let hwid = generateMockHWID();
         let isSessionUnlocked = false; // Requires password every time the app opens
         let currentDownloadUrl = null;
-        let isProcessing = false;
         
         // Trial & Licensing Management
         function generateMockHWID() {
@@ -251,7 +240,7 @@
             // 1. Check Admin Key (Kept permanently so you don't have to enter it)
             if (key === ADMIN_MASTER_KEY) {
                 licenseBar.textContent = "✓ MASTER ADMIN LICENSE ACTIVE";
-                licenseBar.className = "w-full text-center min-h-[44px] py-2 px-4 text-sm font-bold cursor-pointer transition-colors bg-green-50 text-brandGreen flex items-center justify-center";
+                licenseBar.className = "w-full text-center py-2 px-4 text-sm font-bold cursor-pointer transition-colors bg-green-50 text-brandGreen";
                 processBtn.disabled = false;
                 return;
             }
@@ -259,18 +248,18 @@
             // 2. Check Session Beta Status (Memory only, requires password every open)
             if (isSessionUnlocked && now <= BETA_EXPIRATION_DATE) {
                 licenseBar.textContent = "✓ BETA TEST BUILD ACTIVE (Expires Oct 3, 2026)";
-                licenseBar.className = "w-full text-center min-h-[44px] py-2 px-4 text-sm font-bold cursor-pointer transition-colors bg-purple-50 text-purple-700 flex items-center justify-center";
+                licenseBar.className = "w-full text-center py-2 px-4 text-sm font-bold cursor-pointer transition-colors bg-purple-50 text-purple-700";
                 processBtn.disabled = false;
             } else if (isSessionUnlocked && now > BETA_EXPIRATION_DATE) {
                 licenseBar.textContent = "✗ Beta Test Period Expired.";
-                licenseBar.className = "w-full text-center min-h-[44px] py-2 px-4 text-sm font-bold cursor-pointer transition-colors bg-red-50 text-red-600 flex items-center justify-center";
+                licenseBar.className = "w-full text-center py-2 px-4 text-sm font-bold cursor-pointer transition-colors bg-red-50 text-red-600";
                 processBtn.disabled = true;
                 
                 // Show modal on load if expired
                 setTimeout(() => openActivationModal("The beta testing period for this build has ended."), 500);
             } else {
                 licenseBar.textContent = "🔒 App Locked. Beta Password Required.";
-                licenseBar.className = "w-full text-center min-h-[44px] py-2 px-4 text-sm font-bold cursor-pointer transition-colors bg-red-50 text-red-600 flex items-center justify-center";
+                licenseBar.className = "w-full text-center py-2 px-4 text-sm font-bold cursor-pointer transition-colors bg-red-50 text-red-600";
                 processBtn.disabled = true;
                 
                 // Show modal on load to prompt for password
@@ -294,7 +283,7 @@
                 
                 const isMethodExact = document.getElementById('methodExact').checked;
                 if (isMethodExact) {
-                    explanation.innerHTML = "► A blank Letter page will be inserted into the Letter PDF for every single Legal page removed. The Letter PDF page count will match the original file count.";
+                    explanation.innerHTML = "► A blank Letter page will be inserted into the Letter PDF for every single Legal page removed. The Letter PDF page count will match the original file count exactly.";
                 } else {
                     explanation.innerHTML = "► A single blank Letter page will be inserted into the Letter PDF just to mark the spot where a continuous group of Legal pages was removed.";
                 }
@@ -350,48 +339,20 @@
             }
         }
 
-        function getFileArrayBuffer(file) {
-            // Always use FileReader — more reliable on iOS Safari than file.arrayBuffer(),
-            // which can return the same internal buffer reference on repeated calls.
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = () => resolve(reader.result);
-                reader.onerror = () => reject(reader.error);
-                reader.readAsArrayBuffer(file);
-            });
-        }
-
-        function yieldToUI() { return new Promise(r => setTimeout(r, 0)); }
-
         function setStatus(msg, isError = false, isSuccess = false) {
             const el = document.getElementById('statusLabel');
             el.textContent = msg;
-            el.className = "text-sm font-medium min-h-[1.5rem] mt-2 px-2 " + 
+            el.className = "text-sm font-medium h-5 mt-2 " + 
                 (isError ? "text-red-600" : isSuccess ? "text-brandGreen" : "text-brandBlue");
         }
 
-        function addDiag(msg) {
-            console.log('[DIAG] ' + msg);
-            const log = document.getElementById('diagnosticLog');
-            const content = document.getElementById('diagnosticContent');
-            if (log && content) {
-                log.classList.remove('hidden');
-                const line = document.createElement('div');
-                line.textContent = msg;
-                content.appendChild(line);
-                content.scrollTop = content.scrollHeight;
-            }
-        }
-
-        function clearDiag() {
-            const log = document.getElementById('diagnosticLog');
-            const content = document.getElementById('diagnosticContent');
-            if (log) log.classList.add('hidden');
-            if (content) content.innerHTML = '';
+        function renderAppVersionLabel() {
+            const el = document.getElementById('appVersionLabel');
+            if (!el) return;
+            el.textContent = `Last Updated: ${APP_BUILD_VERSION}`;
         }
 
         function triggerFileSelect() {
-            if (isProcessing) return;
             // Check license right before attempting to process
             const licenseBarText = document.getElementById('licenseBar').textContent;
             if (licenseBarText.includes('Expired')) {
@@ -399,23 +360,6 @@
                 return;
             }
             document.getElementById('pdfInput').click();
-        }
-
-        function isAcceptedPdfFile(file) {
-            if (!file || !file.name) return false;
-            const fileType = (file.type || '').toLowerCase();
-            return fileType === 'application/pdf' || /\.pdf$/i.test(file.name);
-        }
-
-        function openBlobUrl(url) {
-            window.location.href = url;
-        }
-
-        function setProcessingState(active) {
-            const processBtn = document.getElementById('processBtn');
-            if (!processBtn) return;
-            processBtn.disabled = active;
-            processBtn.textContent = active ? 'Processing…' : 'Select & Process PDF';
         }
 
         function clearPreviousMobileDownload() {
@@ -441,97 +385,239 @@
             const ratio = longEdge / shortEdge;
             const letterTarget = 11 / 8.5;
             const legalTarget = 14 / 8.5;
+            const letterLong = 792;
+            const legalLong = 1008;
+            const ratioTolerance = 0.16;
 
             const exactLetter = (Math.abs(width - 612) <= 36 && Math.abs(height - 792) <= 36) ||
                 (Math.abs(width - 792) <= 36 && Math.abs(height - 612) <= 36);
             const exactLegal = (Math.abs(width - 612) <= 36 && Math.abs(height - 1008) <= 36) ||
                 (Math.abs(width - 1008) <= 36 && Math.abs(height - 612) <= 36);
 
-            if (exactLetter) {
-                return { type: 'Letter', confidence: 0.99, ratio, width, height };
-            }
-            if (exactLegal) {
-                return { type: 'Legal', confidence: 0.99, ratio, width, height };
-            }
+            if (exactLetter) return { type: 'Letter', confidence: 0.99, ratio, width, height };
+            if (exactLegal) return { type: 'Legal', confidence: 0.99, ratio, width, height };
 
             const letterDiff = Math.abs(ratio - letterTarget);
             const legalDiff = Math.abs(ratio - legalTarget);
+            const letterLongDiff = Math.abs(longEdge - letterLong);
+            const legalLongDiff = Math.abs(longEdge - legalLong);
 
-            if (ratio >= 1.45 || (legalDiff + 0.08) < letterDiff) {
-                return { type: 'Legal', confidence: Math.max(0.66, 1 - (legalDiff / 0.6)), ratio, width, height };
+            // Deterministic split rules for mixed-page packages.
+            if (longEdge >= 900 && legalLongDiff <= (letterLongDiff + 24)) {
+                return { type: 'Legal', confidence: Math.max(0.6, 1 - (legalLongDiff / 300)), ratio, width, height };
             }
 
-            return { type: 'Letter', confidence: Math.max(0.66, 1 - (letterDiff / 0.6)), ratio, width, height };
+            if (ratio >= 1.47) {
+                return { type: 'Legal', confidence: Math.max(0.6, 1 - (legalDiff / ratioTolerance)), ratio, width, height };
+            }
+            if (ratio <= 1.40) {
+                return { type: 'Letter', confidence: Math.max(0.6, 1 - (letterDiff / ratioTolerance)), ratio, width, height };
+            }
+
+            // Best-match fallback for borderline or scaled pages.
+            if (legalDiff < letterDiff) {
+                return { type: 'Legal', confidence: Math.max(0.45, 1 - (legalDiff / ratioTolerance)), ratio, width, height };
+            }
+            return { type: 'Letter', confidence: Math.max(0.45, 1 - (letterDiff / ratioTolerance)), ratio, width, height };
+        }
+
+        function resolvePageClassification(pdfLibClass, pdfJsClass) {
+            const libClass = pdfLibClass || { type: 'Unknown', confidence: 0 };
+            const jsClass = pdfJsClass || { type: 'Unknown', confidence: 0 };
+
+            if (libClass.type === 'Unknown' && jsClass.type !== 'Unknown') return jsClass;
+            if (jsClass.type === 'Unknown' && libClass.type !== 'Unknown') return libClass;
+
+            if (libClass.type !== jsClass.type) {
+                if (libClass.type === 'Legal' || jsClass.type === 'Legal') {
+                    return (libClass.type === 'Legal') ? libClass : jsClass;
+                }
+                return (jsClass.confidence > libClass.confidence) ? jsClass : libClass;
+            }
+
+            return (jsClass.confidence > libClass.confidence) ? jsClass : libClass;
+        }
+
+        function isMobileBrowser() {
+            const ua = navigator.userAgent || '';
+            const touchMac = /Macintosh/i.test(ua) && navigator.maxTouchPoints > 1;
+            return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua) || touchMac;
+        }
+
+        function yieldToUI() {
+            return new Promise(resolve => setTimeout(resolve, 0));
+        }
+
+        function validateClassifiedPageAccounting(pageCount, pagesData, classifiedLetterCount, classifiedLegalCount, actualLetterPages, actualLegalPages, placeholderMode, placeholderCount, expectedFinalLetterPagesBuilt, finalLetterCount, finalLegalCount, placeholderOutputPagesCreated) {
+            const uniqueOriginalPages = new Set();
+            const uniqueLetterOutputPages = new Set();
+            const uniqueLegalOutputPages = new Set();
+            let mappedPlaceholderRefs = 0;
+            for (const page of pagesData) {
+                if (!Number.isInteger(page.original_page) || page.original_page < 1 || page.original_page > pageCount) {
+                    throw new Error(`Page accounting validation failed: Invalid original page reference (${page.original_page}).`);
+                }
+                uniqueOriginalPages.add(page.original_page);
+                if (page.size !== 'Letter' && page.size !== 'Legal') {
+                    throw new Error(`Page accounting validation failed: Unsupported page classification at original page ${page.original_page}.`);
+                }
+
+                if (page.size === 'Letter') {
+                    if (!Number.isInteger(page.letter_output_page) || page.letter_output_page < 1) {
+                        throw new Error(`Page accounting validation failed: Letter page ${page.original_page} is missing a valid Letter output page mapping.`);
+                    }
+                    if (uniqueLetterOutputPages.has(page.letter_output_page)) {
+                        throw new Error(`Page accounting validation failed: Duplicate Letter output page mapping (${page.letter_output_page}).`);
+                    }
+                    uniqueLetterOutputPages.add(page.letter_output_page);
+                    if (page.legal_output_page !== null) {
+                        throw new Error(`Page accounting validation failed: Letter page ${page.original_page} should not have a Legal output page mapping.`);
+                    }
+                    if (page.placeholder_output_page !== null) {
+                        throw new Error(`Page accounting validation failed: Letter page ${page.original_page} should not have a placeholder output page mapping.`);
+                    }
+                }
+
+                if (page.size === 'Legal') {
+                    if (!Number.isInteger(page.legal_output_page) || page.legal_output_page < 1) {
+                        throw new Error(`Page accounting validation failed: Legal page ${page.original_page} is missing a valid Legal output page mapping.`);
+                    }
+                    if (uniqueLegalOutputPages.has(page.legal_output_page)) {
+                        throw new Error(`Page accounting validation failed: Duplicate Legal output page mapping (${page.legal_output_page}).`);
+                    }
+                    uniqueLegalOutputPages.add(page.legal_output_page);
+                    if (page.letter_output_page !== null) {
+                        throw new Error(`Page accounting validation failed: Legal page ${page.original_page} should not have a Letter output page mapping.`);
+                    }
+                    if (page.placeholder_output_page !== null && (!Number.isInteger(page.placeholder_output_page) || page.placeholder_output_page < 1)) {
+                        throw new Error(`Page accounting validation failed: Legal page ${page.original_page} has an invalid placeholder output page mapping.`);
+                    }
+                }
+            }
+
+            if (pagesData.length !== pageCount || uniqueOriginalPages.size !== pageCount) {
+                throw new Error(`Page accounting validation failed: expected ${pageCount} source pages represented exactly once, got entries=${pagesData.length}, uniqueOriginals=${uniqueOriginalPages.size}.`);
+            }
+            if ((actualLetterPages + actualLegalPages) !== pageCount) {
+                throw new Error(`Page accounting validation failed: Letter (${actualLetterPages}) + Legal (${actualLegalPages}) does not equal source count (${pageCount}).`);
+            }
+            if ((classifiedLetterCount + classifiedLegalCount) !== pageCount) {
+                throw new Error(`Page accounting validation failed: classified Letter (${classifiedLetterCount}) + classified Legal (${classifiedLegalCount}) does not equal source count (${pageCount}).`);
+            }
+            if (actualLetterPages !== classifiedLetterCount) {
+                throw new Error(`Page accounting validation failed: actual Letter pages (${actualLetterPages}) do not match classified Letter pages (${classifiedLetterCount}).`);
+            }
+            if (actualLegalPages !== classifiedLegalCount) {
+                throw new Error(`Page accounting validation failed: actual Legal pages (${actualLegalPages}) do not match classified Legal pages (${classifiedLegalCount}).`);
+            }
+            if (finalLegalCount !== actualLegalPages) {
+                throw new Error(`Page accounting validation failed: Legal output pages (${finalLegalCount}) do not match actual Legal pages (${actualLegalPages}).`);
+            }
+            if (uniqueLetterOutputPages.size !== actualLetterPages) {
+                throw new Error(`Page accounting validation failed: mapped Letter output pages (${uniqueLetterOutputPages.size}) do not match actual Letter pages (${actualLetterPages}).`);
+            }
+            if (uniqueLegalOutputPages.size !== actualLegalPages) {
+                throw new Error(`Page accounting validation failed: mapped Legal output pages (${uniqueLegalOutputPages.size}) do not match actual Legal pages (${actualLegalPages}).`);
+            }
+            if (finalLetterCount !== expectedFinalLetterPagesBuilt) {
+                throw new Error(`Page accounting validation failed: final Letter output pages (${finalLetterCount}) do not match constructed Letter output pages (${expectedFinalLetterPagesBuilt}).`);
+            }
+
+            for (let i = 0; i < pagesData.length; i++) {
+                const page = pagesData[i];
+                if (page.size !== 'Legal') continue;
+                const hasPlaceholder = page.placeholder_output_page !== null;
+
+                if (placeholderMode === 'None' && hasPlaceholder) {
+                    throw new Error(`Page accounting validation failed: Legal page ${page.original_page} should not have placeholder mapping in mode "${placeholderMode}".`);
+                }
+
+                if (placeholderMode === 'Exact Page Preservation' && !hasPlaceholder) {
+                    throw new Error(`Page accounting validation failed: Legal page ${page.original_page} is missing placeholder mapping in "${placeholderMode}" mode.`);
+                }
+
+                if (placeholderMode === 'One Placeholder Per Legal Section') {
+                    const prev = i > 0 ? pagesData[i - 1] : null;
+                    const isSectionStart = !prev || prev.size !== 'Legal';
+                    if (isSectionStart && !hasPlaceholder) {
+                        throw new Error(`Page accounting validation failed: Legal section starting at original page ${page.original_page} is missing its placeholder mapping.`);
+                    }
+                    if (!isSectionStart && hasPlaceholder) {
+                        throw new Error(`Page accounting validation failed: Legal page ${page.original_page} should not have placeholder mapping because it is not the first page of a Legal section.`);
+                    }
+                }
+
+                if (hasPlaceholder) {
+                    mappedPlaceholderRefs++;
+                    if (page.placeholder_output_page > finalLetterCount) {
+                        throw new Error(`Page accounting validation failed: placeholder output page mapping (${page.placeholder_output_page}) exceeds final Letter output page count (${finalLetterCount}).`);
+                    }
+                    if (!placeholderOutputPagesCreated.has(page.placeholder_output_page)) {
+                        throw new Error(`Page accounting validation failed: placeholder output page mapping (${page.placeholder_output_page}) does not reference a generated placeholder page.`);
+                    }
+                }
+            }
+
+            if (placeholderOutputPagesCreated.size !== placeholderCount) {
+                throw new Error(`Page accounting validation failed: generated placeholder pages (${placeholderOutputPagesCreated.size}) do not match placeholder count (${placeholderCount}).`);
+            }
+            if (placeholderMode === 'None' && mappedPlaceholderRefs !== 0) {
+                throw new Error(`Page accounting validation failed: found placeholder mappings (${mappedPlaceholderRefs}) when placeholder mode is "${placeholderMode}".`);
+            }
+            if (placeholderMode === 'Exact Page Preservation' && mappedPlaceholderRefs !== actualLegalPages) {
+                throw new Error(`Page accounting validation failed: mapped placeholders (${mappedPlaceholderRefs}) do not match Legal pages (${actualLegalPages}) in "${placeholderMode}" mode.`);
+            }
+            if (placeholderMode === 'One Placeholder Per Legal Section' && mappedPlaceholderRefs !== placeholderCount) {
+                throw new Error(`Page accounting validation failed: mapped section placeholder references (${mappedPlaceholderRefs}) do not match placeholder count (${placeholderCount}) in "${placeholderMode}" mode.`);
+            }
         }
 
         document.getElementById('pdfInput').addEventListener('change', async function(e) {
             if (e.target.files.length > 0) {
                 const file = e.target.files[0];
-                if (!isAcceptedPdfFile(file)) {
-                    clearPreviousMobileDownload();
-                    clearDiag();
-                    setStatus('Please choose a PDF file ending in .pdf.', true);
-                    e.target.value = '';
-                    return;
-                }
                 await startProcessing(file);
                 e.target.value = ''; // Reset input
             }
         });
 
         async function startProcessing(file) {
-            if (isProcessing) {
-                setStatus('A document is already being processed.');
-                return;
-            }
-            isProcessing = true;
-            setProcessingState(true);
             clearPreviousMobileDownload();
-            clearDiag();
-            addDiag(`File: ${file.name} (${(file.size / 1024).toFixed(0)} KB)`);
             let pdfJsDoc = null;
-            let pdfJsLoadingTask = null;
+            let arrayBuffer = null;
+            let extractedHeaders = [];
+            let pdfJsPageDimensions = [];
+            let pageClassifications = [];
+            let pagesData = [];
             try {
+                const mobileMode = isMobileBrowser();
                 setStatus(`Reading ${file.name}...`);
-                const rawBuffer = await getFileArrayBuffer(file);
-                const pdfJsBuffer = rawBuffer.slice(0);
-                const pdfLibBuffer = rawBuffer.slice(0);
-
+                arrayBuffer = await file.arrayBuffer();
+                
                 // ==========================================
                 // PHASE 1: TEXT EXTRACTION (PDF.js)
                 // ==========================================
                 setStatus("Phase 1: Analyzing page headers...");
-                pdfJsLoadingTask = pdfjsLib.getDocument({ data: new Uint8Array(pdfJsBuffer.slice(0)) });
-                pdfJsDoc = await pdfJsLoadingTask.promise;
+                pdfJsDoc = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer).slice(0) }).promise;
                 const pageCount = pdfJsDoc.numPages;
-                addDiag(`PDF.js loaded: ${pageCount} pages`);
-
-                let extractedHeaders = [];
-                let pdfJsPageDimensions = [];
+                
                 for (let i = 1; i <= pageCount; i++) {
-                    if (i === 1 || i % 4 === 0 || i === pageCount) {
-                        setStatus(`Phase 1: Reading page ${i} of ${pageCount}...`);
-                        await yieldToUI();
-                    }
-                    const preview = await extractPagePreview(pdfJsDoc, i);
-                    extractedHeaders.push(preview.headerText);
-                    pdfJsPageDimensions.push({ width: preview.width, height: preview.height });
+                    if (i % 5 === 0) setStatus(`Reading headers: Page ${i} of ${pageCount}...`);
+                    const pagePreview = await extractHeaderPreview(pdfJsDoc, i);
+                    extractedHeaders.push(pagePreview.headerText);
+                    pdfJsPageDimensions.push({ width: pagePreview.width, height: pagePreview.height });
+                    if (mobileMode && i % 3 === 0) await yieldToUI();
                 }
                 
                 await pdfJsDoc.destroy();
                 pdfJsDoc = null;
-                if (pdfJsLoadingTask) {
-                    await pdfJsLoadingTask.destroy();
-                    pdfJsLoadingTask = null;
-                }
                 
                 // ==========================================
                 // PHASE 2: STRUCTURAL SPLITTING (PDF-Lib)
                 // ==========================================
                 setStatus("Phase 2: Separating Legal and Letter pages...");
                 const { PDFDocument } = PDFLib;
-                const srcDoc = await PDFDocument.load(pdfLibBuffer);
-                addDiag(`PDF-lib loaded successfully`);
+                const srcBytes = new Uint8Array(arrayBuffer);
+                const srcDoc = await PDFDocument.load(srcBytes.slice(0));
                 
                 const letterDoc = await PDFDocument.create();
                 const legalDoc = await PDFDocument.create();
@@ -540,104 +626,171 @@
                 const isMethodExact = document.getElementById('methodExact').checked;
                 const placeholderMode = isPreserveYes ? (isMethodExact ? "Exact Page Preservation" : "One Placeholder Per Legal Section") : "None";
 
-                let pagesData = [];
                 let letterIndices = [];
                 let legalIndices = [];
                 let placeholderCount = 0;
                 let prevSize = null;
-                let pageClassifications = [];
+                const unknownPages = [];
+                const legalIndexSet = new Set();
+                const placeholderOutputPagesCreated = new Set();
 
                 for (let i = 0; i < pageCount; i++) {
-                    if (i === 0 || (i + 1) % 4 === 0 || i === pageCount - 1) {
-                        setStatus(`Phase 2: Classifying page ${i + 1} of ${pageCount}...`);
-                        await yieldToUI();
-                    }
                     const srcPage = srcDoc.getPage(i);
                     const { width, height } = srcPage.getSize();
-                    let pageClass = classifyPageDimensions(width, height);
-
-                    // iOS Safari fallback: if PDF-lib returns invalid dimensions, use PDF.js dimensions
-                    if (pageClass.type === 'Unknown' && pdfJsPageDimensions[i]) {
-                        const fb = pdfJsPageDimensions[i];
-                        if (fb.width > 0 && fb.height > 0) {
-                            pageClass = classifyPageDimensions(fb.width, fb.height);
-                            addDiag(`Page ${i+1}: PDF-lib dims invalid, fallback to PDF.js (${fb.width.toFixed(0)}x${fb.height.toFixed(0)}) → ${pageClass.type}`);
-                        }
-                    }
-                    addDiag(`Page ${i+1}: ${width.toFixed(0)}x${height.toFixed(0)} → ${pageClass.type} (conf ${pageClass.confidence.toFixed(2)})`);
+                    const libPageClass = classifyPageDimensions(width, height);
+                    const jsDims = pdfJsPageDimensions[i];
+                    const jsPageClass = (jsDims && Number.isFinite(jsDims.width) && Number.isFinite(jsDims.height))
+                        ? classifyPageDimensions(jsDims.width, jsDims.height)
+                        : { type: 'Unknown', confidence: 0, ratio: 0, width: jsDims?.width, height: jsDims?.height, reason: 'Missing PDF.js dimensions' };
+                    const pageClass = resolvePageClassification(libPageClass, jsPageClass);
                     pageClassifications.push(pageClass);
 
                     const isLegal = pageClass.type === 'Legal';
-                    if (isLegal) legalIndices.push(i);
-                    else letterIndices.push(i);
+                    if (isLegal) {
+                        legalIndices.push(i);
+                        legalIndexSet.add(i);
+                    } else if (pageClass.type === 'Letter') {
+                        letterIndices.push(i);
+                    } else {
+                        unknownPages.push({
+                            page: i + 1,
+                            width: pageClass.width,
+                            height: pageClass.height,
+                            reason: pageClass.reason || 'Unknown page size'
+                        });
+                    }
+                    if (mobileMode && i % 5 === 0) await yieldToUI();
                 }
 
-                // Copy pages in batches to reduce UI blocking while keeping memory usage controlled.
-                const copiedLetterPages = await copyPagesWithYield(letterDoc, srcDoc, letterIndices, 'Phase 3: Copying Letter pages');
-                const copiedLegalPages = await copyPagesWithYield(legalDoc, srcDoc, legalIndices, 'Phase 3: Copying Legal pages');
+                if (unknownPages.length > 0) {
+                    const pagesList = unknownPages
+                        .map(p => `#${p.page} (${p.reason}; ${Number(p.width || 0).toFixed(2)}x${Number(p.height || 0).toFixed(2)})`)
+                        .join(', ');
+                    throw new Error(`Unable to classify page size for source page(s): ${pagesList}. Processing stopped for review.`);
+                }
 
                 let actualLetterPages = 0;
                 let actualLegalPages = 0;
-                let letterDocIndex = 0;
-                let legalDocIndex = 0;
                 let letterOutputPage = 0;
                 let legalOutputPage = 0;
+                let builtCount = 0;
+                let pageCursor = 0;
+                while (pageCursor < pageCount) {
+                    const runIsLegal = legalIndexSet.has(pageCursor);
+                    const runStart = pageCursor;
+                    while (pageCursor < pageCount && legalIndexSet.has(pageCursor) === runIsLegal) {
+                        pageCursor++;
+                    }
+                    const runEnd = pageCursor - 1;
+                    const runIndices = [];
+                    for (let j = runStart; j <= runEnd; j++) runIndices.push(j);
 
-                for (let i = 0; i < pageCount; i++) {
-                    if (i % 10 === 0) { setStatus(`Assembling: Page ${i+1} of ${pageCount}...`); await yieldToUI(); }
-                    const pageNum = i + 1;
-                    const pageClass = pageClassifications[i];
-                    const sizeStr = pageClass.type === 'Legal' ? 'Legal' : 'Letter';
-                    
-                    let newLegalNum = null;
-                    let newLetterNum = null;
+                    if (runIsLegal) {
+                        const copiedLegalRun = await legalDoc.copyPages(srcDoc, runIndices);
+                        for (let runOffset = 0; runOffset < copiedLegalRun.length; runOffset++) {
+                            const pageIndex = runStart + runOffset;
+                            if (builtCount % 5 === 0) setStatus(`Phase 3: Building outputs (${builtCount + 1}/${pageCount})...`);
+                            const pageNum = pageIndex + 1;
+                            const pageClass = pageClassifications[pageIndex] || { type: 'Unknown', ratio: 0, confidence: 0 };
+                            const sizeStr = 'Legal';
+                            let newLegalNum = null;
+                            let newLetterNum = null;
+                            let placeholderOutputPage = null;
 
-                    if (pageClass.type === 'Legal') {
-                        actualLegalPages++;
-                        legalOutputPage++;
-                        newLegalNum = legalOutputPage;
+                            actualLegalPages++;
+                            legalOutputPage++;
+                            newLegalNum = legalOutputPage;
+                            legalDoc.addPage(copiedLegalRun[runOffset]);
 
-                        legalDoc.addPage(copiedLegalPages[legalDocIndex]);
-                        legalDocIndex++;
-                        
-                        if (placeholderMode === "Exact Page Preservation") {
-                            letterDoc.addPage([612, 792]);
-                            letterOutputPage++;
-                            newLetterNum = letterOutputPage;
-                            placeholderCount++;
-                        } else if (placeholderMode === "One Placeholder Per Legal Section") {
-                            if (prevSize !== "Legal") {
+                            if (placeholderMode === "Exact Page Preservation") {
                                 letterDoc.addPage([612, 792]);
                                 letterOutputPage++;
-                                newLetterNum = letterOutputPage;
+                                placeholderOutputPage = letterOutputPage;
+                                placeholderOutputPagesCreated.add(placeholderOutputPage);
                                 placeholderCount++;
+                            } else if (placeholderMode === "One Placeholder Per Legal Section") {
+                                if (prevSize !== "Legal") {
+                                    letterDoc.addPage([612, 792]);
+                                    letterOutputPage++;
+                                    placeholderOutputPage = letterOutputPage;
+                                    placeholderOutputPagesCreated.add(placeholderOutputPage);
+                                    placeholderCount++;
+                                }
                             }
+
+                            pagesData.push({
+                                original_page: pageNum,
+                                size: sizeStr,
+                                preview_text: extractedHeaders[pageIndex] || '[No identifying header found]',
+                                new_legal_page: newLegalNum,
+                                letter_output_page: newLetterNum,
+                                legal_output_page: newLegalNum,
+                                placeholder_output_page: placeholderOutputPage,
+                                aspect_ratio: pageClass.ratio,
+                                confidence: pageClass.confidence,
+                                width: pageClass.width,
+                                height: pageClass.height
+                            });
+
+                            prevSize = sizeStr;
+                            builtCount++;
+                            if (mobileMode && builtCount % 4 === 0) await yieldToUI();
                         }
                     } else {
-                        actualLetterPages++;
-                        letterOutputPage++;
-                        newLetterNum = letterOutputPage;
-                        letterDoc.addPage(copiedLetterPages[letterDocIndex]);
-                        letterDocIndex++;
+                        const copiedLetterRun = await letterDoc.copyPages(srcDoc, runIndices);
+                        for (let runOffset = 0; runOffset < copiedLetterRun.length; runOffset++) {
+                            const pageIndex = runStart + runOffset;
+                            if (builtCount % 5 === 0) setStatus(`Phase 3: Building outputs (${builtCount + 1}/${pageCount})...`);
+                            const pageNum = pageIndex + 1;
+                            const pageClass = pageClassifications[pageIndex] || { type: 'Unknown', ratio: 0, confidence: 0 };
+                            const sizeStr = 'Letter';
+                            let newLegalNum = null;
+                            let newLetterNum = null;
+                            let placeholderOutputPage = null;
+
+                            actualLetterPages++;
+                            letterOutputPage++;
+                            newLetterNum = letterOutputPage;
+                            letterDoc.addPage(copiedLetterRun[runOffset]);
+
+                            pagesData.push({
+                                original_page: pageNum,
+                                size: sizeStr,
+                                preview_text: extractedHeaders[pageIndex] || '[No identifying header found]',
+                                new_legal_page: newLegalNum,
+                                letter_output_page: newLetterNum,
+                                legal_output_page: newLegalNum,
+                                placeholder_output_page: placeholderOutputPage,
+                                aspect_ratio: pageClass.ratio,
+                                confidence: pageClass.confidence,
+                                width: pageClass.width,
+                                height: pageClass.height
+                            });
+
+                            prevSize = sizeStr;
+                            builtCount++;
+                            if (mobileMode && builtCount % 4 === 0) await yieldToUI();
+                        }
                     }
-                    
-                    pagesData.push({
-                        original_page: pageNum,
-                        size: sizeStr,
-                        preview_text: extractedHeaders[i] || '[No identifying header found]',
-                        new_legal_page: newLegalNum,
-                        letter_output_page: newLetterNum,
-                        legal_output_page: newLegalNum,
-                        aspect_ratio: pageClass.ratio,
-                        confidence: pageClass.confidence,
-                        width: pageClass.width,
-                        height: pageClass.height
-                    });
-                    
-                    prevSize = sizeStr;
+                    if (mobileMode) await yieldToUI();
                 }
 
-                addDiag(`Split complete: ${actualLetterPages} Letter, ${actualLegalPages} Legal pages`);
+                pagesData.sort((a, b) => a.original_page - b.original_page);
+
+                validateClassifiedPageAccounting(
+                    pageCount,
+                    pagesData,
+                    letterIndices.length,
+                    legalIndices.length,
+                    actualLetterPages,
+                    actualLegalPages,
+                    placeholderMode,
+                    placeholderCount,
+                    letterOutputPage,
+                    letterDoc.getPageCount(),
+                    legalDoc.getPageCount(),
+                    placeholderOutputPagesCreated
+                );
 
                 // ==========================================
                 // PHASE 4: REPORTS & PACKAGING
@@ -661,7 +814,7 @@
                 
                 zip.file("3_Reassembly_Guide.pdf", reportBlob);
                 
-                const zipBlob = await zip.generateAsync({ type: 'blob' });
+                const zipBlob = await zip.generateAsync(mobileMode ? { type: 'blob', compression: 'STORE' } : { type: 'blob' });
                 const timestamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
                 const baseName = file.name.replace(/\.[^/.]+$/, '');
                 const fileName = `${baseName}_Processed_${timestamp}.zip`;
@@ -670,87 +823,51 @@
                 const blobUrl = URL.createObjectURL(zipBlob);
                 currentDownloadUrl = blobUrl;
                 const actionContainer = document.getElementById('processBtn').parentElement;
-
-                const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-                const shareFile = new File([zipBlob], fileName, { type: 'application/zip' });
-                let canWebShare = false;
-                try {
-                    canWebShare = typeof navigator.share === 'function' && typeof navigator.canShare === 'function' && navigator.canShare({ files: [shareFile] });
-                } catch (e) { canWebShare = false; }
-
+                
                 const dlButtonHtml = `
-                    <a href="${blobUrl}" download="${fileName}" id="mobileDlBtn" class="mt-6 block w-full min-h-[44px] px-6 py-4 bg-brandGreen hover:bg-green-700 text-white font-extrabold rounded shadow-lg border border-green-600 text-center break-words">
+                    <a href="${blobUrl}" download="${fileName}" id="mobileDlBtn" class="mt-6 block w-full px-6 py-4 bg-brandGreen hover:bg-green-700 text-white font-extrabold rounded shadow-lg border-2 border-green-600 animate-pulse text-center text-lg transition-colors">
                         ⬇️ TAP HERE TO DOWNLOAD ZIP ⬇️
                     </a>
                 `;
-
+                
                 const tempDiv = document.createElement('div');
                 tempDiv.innerHTML = dlButtonHtml;
-                actionContainer.appendChild(tempDiv.firstElementChild);
-
-                const isMobileBrowser = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(navigator.userAgent);
-
-                if (isIOS && canWebShare) {
-                    // iOS Safari: Web Share API is the primary path (blob downloads are blocked)
-                    const dlBtn = document.getElementById('mobileDlBtn');
-                    if (dlBtn) {
-                        dlBtn.addEventListener('click', async (e) => {
-                            e.preventDefault();
-                            dlBtn.textContent = '⏳ SHARING…';
-                            dlBtn.classList.add('opacity-75');
-                            try {
-                                await navigator.share({ files: [shareFile], title: fileName });
-                                dlBtn.textContent = '✓ SAVED!';
-                            } catch (shareErr) {
-                                if (shareErr && shareErr.name !== 'AbortError') {
-                                    console.warn('Share failed, opening blob URL', shareErr);
-                                    openBlobUrl(blobUrl);
-                                }
-                                dlBtn.textContent = '⬇️ TAP HERE TO DOWNLOAD ZIP ⬇️';
-                                dlBtn.classList.remove('opacity-75');
-                            }
-                        });
-                    }
-                } else {
-                    if (!isMobileBrowser) {
-                        try { saveAs(zipBlob, fileName); } catch (e) { console.warn('Auto-download suppressed.', e); }
-                    }
+                let mobileLink = tempDiv.firstElementChild;
+                if (!mobileLink) {
+                    mobileLink = document.createElement('a');
+                    mobileLink.href = blobUrl;
+                    mobileLink.download = fileName;
+                    mobileLink.id = 'mobileDlBtn';
+                    mobileLink.className = 'mt-6 block w-full px-6 py-4 bg-brandGreen hover:bg-green-700 text-white font-extrabold rounded shadow-lg border-2 border-green-600 animate-pulse text-center text-lg transition-colors';
+                    mobileLink.textContent = '⬇️ TAP HERE TO DOWNLOAD ZIP ⬇️';
                 }
-                setStatus(isMobileBrowser ? 'Success! Tap the green button above to save.' : 'Success! Your ZIP download should begin automatically.', false, true);
+                actionContainer.appendChild(mobileLink);
+
+                if (!mobileMode) {
+                    try { saveAs(zipBlob, fileName); } catch (e) { console.warn('Auto-download suppressed.', e); }
+                    setStatus('Success! Download started. If blocked, use the green button.', false, true);
+                } else {
+                    setStatus('Success! Tap the green button above to save.', false, true);
+                }
 
             } catch (err) {
                 console.error(err);
-                addDiag(`ERROR: ${err.message}`);
-                setStatus('Error: ' + err.message, true);
-            } finally {
                 if (pdfJsDoc) await pdfJsDoc.destroy().catch(e => console.log(e));
-                if (pdfJsLoadingTask) await pdfJsLoadingTask.destroy().catch(e => console.log(e));
-                isProcessing = false;
-                setProcessingState(false);
-                checkLicensingState();
+                setStatus('An error occurred during processing.', true);
+                alert('Error: ' + err.message);
             }
         }
 
-        async function copyPagesWithYield(targetDoc, srcDoc, indices, label) {
-            const copiedPages = [];
-            for (let start = 0; start < indices.length; start += 4) {
-                const chunk = indices.slice(start, start + 4);
-                setStatus(`${label}: ${Math.min(start + chunk.length, indices.length)} of ${indices.length}...`);
-                copiedPages.push(...await targetDoc.copyPages(srcDoc, chunk));
-                await yieldToUI();
-            }
-            return copiedPages;
-        }
-
-        async function extractPagePreview(pdfJsDoc, pageNum) {
-            let page = null;
+        async function extractHeaderPreview(pdfJsDoc, pageNum) {
             try {
-                page = await pdfJsDoc.getPage(pageNum);
+                const page = await pdfJsDoc.getPage(pageNum);
                 const viewport = page.getViewport({ scale: 1 });
+                const pageWidth = Math.abs(Number(viewport.width) || 0);
+                const pageHeight = Math.abs(Number(viewport.height) || 0);
                 const textContent = await page.getTextContent();
                 
                 if (!textContent.items || textContent.items.length === 0) {
-                    return { headerText: '[Image Only / Blank Page]', width: viewport.width, height: viewport.height };
+                    return { headerText: '[Image Only / Blank Page]', width: pageWidth, height: pageHeight };
                 }
                 
                 let lines = {};
@@ -796,16 +913,12 @@
 
                 return {
                     headerText: bestText ? bestText.substring(0, 85) : '[No identifying header found]',
-                    width: viewport.width,
-                    height: viewport.height
+                    width: pageWidth,
+                    height: pageHeight
                 };
             } catch (e) {
                 console.warn('Header Extraction Skipped:', e);
-                return { headerText: '[Error reading text]', width: 0, height: 0 };
-            } finally {
-                if (page) {
-                    try { page.cleanup(); } catch (cleanupErr) { console.warn('PDF.js page cleanup skipped', cleanupErr); }
-                }
+                return { headerText: '[Error reading text]', width: NaN, height: NaN };
             }
         }
 
@@ -834,6 +947,91 @@
             
             const marginX = 40;
             let cursorY = 50;
+            const bottomMargin = 50;
+            const pagesByOriginal = new Map(pagesData.map(p => [p.original_page, p]));
+
+            function getPageHeight() {
+                return doc.internal.pageSize.getHeight();
+            }
+
+            function addPageWithCurrentState() {
+                const currentFont = doc.getFont();
+                const currentFontSize = doc.getFontSize();
+                const currentTextColor = doc.getTextColor();
+                doc.addPage();
+                cursorY = 50;
+                doc.setFont(currentFont.fontName, currentFont.fontStyle);
+                doc.setFontSize(currentFontSize);
+                if (Array.isArray(currentTextColor)) {
+                    doc.setTextColor(...currentTextColor);
+                } else if (typeof currentTextColor === 'number') {
+                    doc.setTextColor(currentTextColor);
+                } else if (typeof currentTextColor === 'string') {
+                    const colorValue = currentTextColor.trim();
+                    if (/^#?[0-9a-fA-F]{6}$/.test(colorValue)) {
+                        const hex = colorValue.replace('#', '');
+                        const r = parseInt(hex.slice(0, 2), 16);
+                        const g = parseInt(hex.slice(2, 4), 16);
+                        const b = parseInt(hex.slice(4, 6), 16);
+                        doc.setTextColor(r, g, b);
+                    } else if (/^\d+(\.\d+)?(\s+\d+(\.\d+)?){0,3}$/.test(colorValue)) {
+                        const numericParts = colorValue.split(/\s+/).map(Number).filter(Number.isFinite);
+                        doc.setTextColor(...numericParts);
+                    } else {
+                        doc.setTextColor(colorValue);
+                    }
+                }
+            }
+
+            function ensureSpace(requiredHeight = 14) {
+                while (true) {
+                    const pageHeight = getPageHeight();
+                    const usableHeight = (pageHeight - bottomMargin) - 50;
+                    if (usableHeight <= 0) {
+                        throw new Error('Report generation failed: printable page height is invalid.');
+                    }
+                    const normalizedRequired = Math.min(requiredHeight, usableHeight);
+                    if (cursorY + normalizedRequired <= pageHeight - bottomMargin) break;
+                    addPageWithCurrentState();
+                }
+            }
+
+            function writeLine(text, step = 14) {
+                const lineHeight = 12;
+                const extraSpacing = Math.max(0, step - lineHeight);
+                writeWrappedText(text, doc.internal.pageSize.width - (marginX * 2), lineHeight, extraSpacing);
+            }
+
+            function writeWrappedText(text, width, lineHeight = 12, extraSpacing = 0) {
+                const wrapped = doc.splitTextToSize(text, width);
+                let lineIndex = 0;
+
+                while (lineIndex < wrapped.length) {
+                    ensureSpace(lineHeight);
+                    const pageHeight = getPageHeight();
+                    const availableHeight = (pageHeight - bottomMargin) - cursorY;
+                    const linesFit = Math.max(1, Math.floor(availableHeight / lineHeight));
+                    const segment = wrapped.slice(lineIndex, lineIndex + linesFit);
+                    doc.text(segment, marginX, cursorY);
+                    cursorY += segment.length * lineHeight;
+                    lineIndex += segment.length;
+
+                    if (lineIndex < wrapped.length) {
+                        addPageWithCurrentState();
+                    }
+                }
+
+                ensureSpace(extraSpacing);
+                cursorY += extraSpacing;
+            }
+
+            function findPrecedingLetterPage(startOriginalPage) {
+                for (let i = startOriginalPage - 1; i >= 1; i--) {
+                    const candidate = pagesByOriginal.get(i);
+                    if (candidate && candidate.size === 'Letter') return candidate;
+                }
+                return null;
+            }
 
             doc.setFont('helvetica', 'bold');
             doc.setFontSize(18);
@@ -854,17 +1052,17 @@
 
             doc.setFont('helvetica', 'normal');
             doc.setFontSize(10);
-            doc.text("Step 1: Print the '1_Letter_Pages.pdf' file on standard Letter (8.5 x 11) paper.", marginX, cursorY); cursorY += 16;
-            doc.text("Step 2: Print the '2_Legal_Pages.pdf' file on Legal (8.5 x 14) paper.", marginX, cursorY); cursorY += 16;
+            writeLine("Step 1: Print the '1_Letter_Pages.pdf' file on standard Letter (8.5 x 11) paper.", 16);
+            writeLine("Step 2: Print the '2_Legal_Pages.pdf' file on Legal (8.5 x 14) paper.", 16);
             
             if (pMode === 'None') {
-                doc.text('Step 3: Use the checklist below to insert your newly printed Legal pages into the Letter stack.', marginX, cursorY); cursorY += 25;
+                writeLine('Step 3: Use the checklist below to insert your newly printed Legal pages into the Letter stack.', 25);
             } else if (pMode === 'Exact Page Preservation') {
-                doc.text('Step 3: Your Letter stack contains blank placeholder pages where Legal pages belong.', marginX, cursorY); cursorY += 14;
-                doc.text('        Use the checklist below to swap the blank pages with your printed Legal pages.', marginX, cursorY); cursorY += 25;
+                writeLine('Step 3: Your Letter stack contains blank placeholder pages where Legal pages belong.', 14);
+                writeLine('        Use the checklist below to swap the blank pages with your printed Legal pages.', 25);
             } else {
-                doc.text('Step 3: Your Letter stack contains blank marker pages indicating Legal sections.', marginX, cursorY); cursorY += 14;
-                doc.text('        Use the checklist below to replace those blank markers with your printed Legal pages.', marginX, cursorY); cursorY += 25;
+                writeLine('Step 3: Your Letter stack contains blank marker pages indicating Legal sections.', 14);
+                writeLine('        Use the checklist below to replace those blank markers with your printed Legal pages.', 25);
             }
 
             doc.setFont('helvetica', 'bold');
@@ -874,15 +1072,15 @@
             
             doc.setFont('helvetica', 'normal');
             doc.setFontSize(10);
-            doc.text(`File Name: ${filename}`, marginX, cursorY); cursorY += 14;
-            doc.text(`Original Pages: ${origCount}`, marginX, cursorY); cursorY += 20;
+            writeLine(`File Name: ${filename}`, 14);
+            writeLine(`Original Pages: ${origCount}`, 20);
             
-            doc.text(`Letter Pages: ${letterCount}`, marginX, cursorY); cursorY += 14;
-            doc.text(`Legal Pages: ${legalCount}`, marginX, cursorY); cursorY += 20;
+            writeLine(`Letter Pages: ${letterCount}`, 14);
+            writeLine(`Legal Pages: ${legalCount}`, 20);
             
-            doc.text(`Placeholder Mode: ${pMode}`, marginX, cursorY); cursorY += 14;
-            doc.text(`Placeholder Pages Added: ${pCount}`, marginX, cursorY); cursorY += 14;
-            doc.text(`Final Letter PDF Pages: ${finalLetterCount}`, marginX, cursorY); cursorY += 30;
+            writeLine(`Placeholder Mode: ${pMode}`, 14);
+            writeLine(`Placeholder Pages Added: ${pCount}`, 14);
+            writeLine(`Final Letter PDF Pages: ${finalLetterCount}`, 30);
 
             doc.setFont('helvetica', 'bold');
             doc.setFontSize(14);
@@ -890,11 +1088,11 @@
             
             doc.setTextColor(255, 0, 0);
             doc.setFontSize(10);
-            const disclaimerText = "The document header shown below is provided only as a reference. ALWAYS use the Original Page Number and 'Insert After' Number as the authoritative instruction for reassembly.";
-            const splitDisclaimer = doc.splitTextToSize(disclaimerText, doc.internal.pageSize.width - (marginX * 2));
-            doc.text(splitDisclaimer, marginX, cursorY);
-            cursorY += (splitDisclaimer.length * 12) + 15;
+            const disclaimerText = "The document header shown below is provided only as a reference. ALWAYS use the Original Page Number and 'Insert After' Number as the authoritative instruction for reassembly. The placeholder pages are only there to preserve position.";
+            writeWrappedText(disclaimerText, doc.internal.pageSize.width - (marginX * 2), 12, 15);
             doc.setTextColor(0, 0, 0);
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(10);
 
             doc.setFont('helvetica', 'bold');
             doc.setFontSize(14);
@@ -904,27 +1102,14 @@
             doc.setFontSize(10);
             
             if (legalGroups.length === 0) {
-                doc.text('No legal pages found in this document.', marginX, cursorY);
+                writeLine('No legal pages found in this document.', 14);
             } else {
                 for (let group of legalGroups) {
-                    if (cursorY > doc.internal.pageSize.height - 100) {
-                        doc.addPage();
-                        cursorY = 50;
-                    }
-
                     const startPage = group[0].original_page;
                     const endPage = group[group.length-1].original_page;
-                    const newStart = group[0].new_legal_page;
-                    const newEnd = group[group.length-1].new_legal_page;
-                    
-                    let precedingLetterPage = null;
-                    for (let i = startPage - 1; i >= 1; i--) {
-                        const candidate = pagesData.find(p => p.original_page === i);
-                        if (candidate && candidate.size === 'Letter') {
-                            precedingLetterPage = candidate;
-                            break;
-                        }
-                    }
+                    const newStart = group[0].legal_output_page;
+                    const newEnd = group[group.length-1].legal_output_page;
+                    const precedingLetterPage = findPrecedingLetterPage(startPage);
                     
                     const insertAfter = precedingLetterPage ? precedingLetterPage.original_page : 0;
                     const precedingLetterOutputPage = precedingLetterPage ? precedingLetterPage.letter_output_page : 0;
@@ -938,31 +1123,29 @@
                     }
                     
                     doc.setFont('helvetica', 'bold');
-                    doc.text(l1, marginX, cursorY); cursorY += 12;
+                    writeWrappedText(l1, doc.internal.pageSize.width - (marginX * 2), 12, 0);
                     
                     doc.setFont('helvetica', 'normal');
                     if (insertAfter === 0) {
-                        doc.text('     Place at the very beginning of the document stack.', marginX, cursorY); cursorY += 12;
+                        writeWrappedText('     Place at the very beginning of the document stack.', doc.internal.pageSize.width - (marginX * 2), 12, 0);
                     } else {
-                        doc.text(`     Insert after Original PDF Page ${insertAfter} (Letter output page ${precedingLetterOutputPage}).`, marginX, cursorY); cursorY += 12;
+                        writeWrappedText(`     Insert after Original PDF Page ${insertAfter} (Letter output page ${precedingLetterOutputPage}).`, doc.internal.pageSize.width - (marginX * 2), 12, 0);
                         
                         doc.setFont('helvetica', 'italic');
                         doc.setTextColor(100, 100, 100);
-                        const ptSplit = doc.splitTextToSize(`     Header reference at the top of that page: "${precedingText}"`, doc.internal.pageSize.width - (marginX * 2) - 20);
-                        doc.text(ptSplit, marginX, cursorY);
-                        cursorY += (ptSplit.length * 12) + 8;
+                        writeWrappedText(`     Header reference at the top of that page: "${precedingText}"`, doc.internal.pageSize.width - (marginX * 2) - 20, 12, 8);
                         doc.setTextColor(0, 0, 0);
+                        doc.setFont('helvetica', 'normal');
                     }
+
+                    ensureSpace(8);
                     cursorY += 8;
                 }
             }
 
             if (legalGroups.length > 0) {
                 cursorY += 20;
-                if (cursorY > doc.internal.pageSize.height - 150) {
-                    doc.addPage();
-                    cursorY = 50;
-                }
+                ensureSpace(150);
                 
                 doc.setFont('helvetica', 'bold');
                 doc.setFontSize(14);
@@ -972,17 +1155,9 @@
                 for (let group of legalGroups) {
                     const startPage = group[0].original_page;
                     const endPage = group[group.length-1].original_page;
-                    const newStart = group[0].new_legal_page;
-                    const newEnd = group[group.length-1].new_legal_page;
-                    
-                    let precedingLetterPage = null;
-                    for (let i = startPage - 1; i >= 1; i--) {
-                        const candidate = pagesData.find(p => p.original_page === i);
-                        if (candidate && candidate.size === 'Letter') {
-                            precedingLetterPage = candidate;
-                            break;
-                        }
-                    }
+                    const newStart = group[0].legal_output_page;
+                    const newEnd = group[group.length-1].legal_output_page;
+                    const precedingLetterPage = findPrecedingLetterPage(startPage);
                     
                     const insertAfter = precedingLetterPage ? precedingLetterPage.original_page : 0;
                     const precedingLetterOutputPage = precedingLetterPage ? precedingLetterPage.letter_output_page : 0;
@@ -1016,41 +1191,13 @@
             return doc.output('blob');
         }
 
-        function formatLastUpdated(value) {
-            const parsed = new Date(value);
-            if (!Number.isFinite(parsed.getTime())) return null;
-            const dateStr = parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-            const timeStr = parsed.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true });
-            return `${dateStr}, ${timeStr}`;
-        }
-
-        async function loadLastUpdated() {
-            const el = document.getElementById('lastUpdated');
-            try {
-                const currentPage = window.location.pathname + window.location.search;
-                const resp = await fetch(currentPage + (currentPage.includes('?') ? '&' : '?') + 't=' + Date.now(), { method: 'HEAD', cache: 'no-store' });
-                const lastMod = resp.headers.get('Last-Modified');
-                const formatted = formatLastUpdated(lastMod) || formatLastUpdated(document.lastModified);
-                if (formatted) {
-                    el.textContent = 'Last updated: ' + formatted;
-                    return;
-                }
-            } catch (e) {
-                const fallback = formatLastUpdated(document.lastModified);
-                if (fallback) {
-                    el.textContent = 'Last updated: ' + fallback;
-                    return;
-                }
-            }
-            el.textContent = 'Last updated: unavailable';
-        }
-
         // Initialize App
         document.addEventListener('DOMContentLoaded', () => {
+            renderAppVersionLabel();
             updateUIState();
             checkLicensingState();
             initConnectionGuard();
-            loadLastUpdated();
+            window.addEventListener('beforeunload', clearPreviousMobileDownload);
         });
 
         // --- Connection Guard Logic ---

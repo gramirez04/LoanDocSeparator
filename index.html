@@ -225,7 +225,8 @@
         const ADMIN_MASTER_KEY = "SL-ADMIN-GERMAN-2026";
         const BETA_PASSWORD = "SLTRIAL";
         const BETA_EXPIRATION_DATE = new Date("2026-10-03T23:59:59"); // Expires Oct 3, 2026
-        const LAST_UPDATED = "Sept 28, 2026, 11:40:00 AM";
+        // Last-published timestamp is fetched dynamically from the server's Last-Modified
+        // header so it auto-updates every time the code is published — no manual edit needed.
         let hwid = generateMockHWID();
         let isSessionUnlocked = false; // Requires password every time the app opens
         let currentDownloadUrl = null;
@@ -963,12 +964,31 @@
             return doc.output('blob');
         }
 
+        // Fetch the server's Last-Modified header to display the real publish time
+        async function loadLastPublished() {
+            const el = document.getElementById('versionTimestamp');
+            try {
+                const resp = await fetch(window.location.pathname + '?t=' + Date.now(), { method: 'HEAD', cache: 'no-store' });
+                const lastMod = resp.headers.get('Last-Modified');
+                if (lastMod) {
+                    const d = new Date(lastMod);
+                    const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                    const timeStr = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true });
+                    el.textContent = 'Last Published: ' + dateStr + ', ' + timeStr;
+                } else {
+                    el.textContent = 'Last Published: (unknown)';
+                }
+            } catch (e) {
+                el.textContent = 'Last Published: (offline)';
+            }
+        }
+
         // Initialize App
         document.addEventListener('DOMContentLoaded', () => {
             updateUIState();
             checkLicensingState();
             initConnectionGuard();
-            document.getElementById('versionTimestamp').textContent = 'Last Published: ' + LAST_UPDATED;
+            loadLastPublished();
         });
 
         // --- Connection Guard Logic ---

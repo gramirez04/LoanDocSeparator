@@ -391,6 +391,13 @@
             const letterDiff = Math.abs(ratio - letterTarget);
             const legalDiff = Math.abs(ratio - legalTarget);
 
+            if (letterDiff <= ratioTolerance && legalDiff <= ratioTolerance) {
+                if (letterDiff <= legalDiff) {
+                    return { type: 'Letter', confidence: Math.max(0.45, 1 - (letterDiff / ratioTolerance)), ratio, width, height };
+                }
+                return { type: 'Legal', confidence: Math.max(0.45, 1 - (legalDiff / ratioTolerance)), ratio, width, height };
+            }
+
             if (letterDiff <= ratioTolerance && (letterDiff + dominanceMargin) < legalDiff) {
                 return { type: 'Letter', confidence: Math.max(0.5, 1 - (letterDiff / ratioTolerance)), ratio, width, height };
             }

@@ -419,7 +419,7 @@
             const uniqueOriginalPages = new Set();
             const uniqueLetterOutputPages = new Set();
             const uniqueLegalOutputPages = new Set();
-            const uniquePlaceholderOutputPages = new Set();
+            let mappedPlaceholderRefs = 0;
             for (const page of pagesData) {
                 if (!Number.isInteger(page.original_page) || page.original_page < 1 || page.original_page > pageCount) {
                     throw new Error(`Page accounting validation failed: Invalid original page reference (${page.original_page}).`);
@@ -515,24 +515,27 @@
                 }
 
                 if (hasPlaceholder) {
+                    mappedPlaceholderRefs++;
                     if (page.placeholder_output_page > finalLetterCount) {
                         throw new Error(`Page accounting validation failed: placeholder output page mapping (${page.placeholder_output_page}) exceeds final Letter output page count (${finalLetterCount}).`);
                     }
                     if (!placeholderOutputPagesCreated.has(page.placeholder_output_page)) {
                         throw new Error(`Page accounting validation failed: placeholder output page mapping (${page.placeholder_output_page}) does not reference a generated placeholder page.`);
                     }
-                    if (uniquePlaceholderOutputPages.has(page.placeholder_output_page)) {
-                        throw new Error(`Page accounting validation failed: Duplicate placeholder output page mapping (${page.placeholder_output_page}).`);
-                    }
-                    uniquePlaceholderOutputPages.add(page.placeholder_output_page);
                 }
             }
 
-            if (uniquePlaceholderOutputPages.size !== placeholderCount) {
-                throw new Error(`Page accounting validation failed: mapped placeholder pages (${uniquePlaceholderOutputPages.size}) do not match placeholder count (${placeholderCount}).`);
-            }
             if (placeholderOutputPagesCreated.size !== placeholderCount) {
                 throw new Error(`Page accounting validation failed: generated placeholder pages (${placeholderOutputPagesCreated.size}) do not match placeholder count (${placeholderCount}).`);
+            }
+            if (placeholderMode === 'None' && mappedPlaceholderRefs !== 0) {
+                throw new Error(`Page accounting validation failed: found placeholder mappings (${mappedPlaceholderRefs}) when placeholder mode is "${placeholderMode}".`);
+            }
+            if (placeholderMode === 'Exact Page Preservation' && mappedPlaceholderRefs !== actualLegalPages) {
+                throw new Error(`Page accounting validation failed: mapped placeholders (${mappedPlaceholderRefs}) do not match Legal pages (${actualLegalPages}) in "${placeholderMode}" mode.`);
+            }
+            if (placeholderMode === 'One Placeholder Per Legal Section' && mappedPlaceholderRefs !== placeholderCount) {
+                throw new Error(`Page accounting validation failed: mapped section placeholder references (${mappedPlaceholderRefs}) do not match placeholder count (${placeholderCount}) in "${placeholderMode}" mode.`);
             }
         }
 

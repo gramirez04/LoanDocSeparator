@@ -765,8 +765,17 @@
                 cursorY = 50;
                 doc.setFont(currentFont.fontName, currentFont.fontStyle);
                 doc.setFontSize(currentFontSize);
-                if (typeof currentTextColor === 'string') {
-                    doc.setTextColor(currentTextColor.startsWith('#') ? currentTextColor : `#${currentTextColor}`);
+                if (Array.isArray(currentTextColor)) {
+                    doc.setTextColor(...currentTextColor);
+                } else if (typeof currentTextColor === 'number') {
+                    doc.setTextColor(currentTextColor);
+                } else if (typeof currentTextColor === 'string') {
+                    const numericParts = currentTextColor.split(/\s+/).map(Number).filter(Number.isFinite);
+                    if (numericParts.length > 0) {
+                        doc.setTextColor(...numericParts);
+                    } else {
+                        doc.setTextColor(currentTextColor.startsWith('#') ? currentTextColor : `#${currentTextColor}`);
+                    }
                 }
             }
 

@@ -757,10 +757,22 @@
             const bottomMargin = 50;
             const pagesByOriginal = new Map(pagesData.map(p => [p.original_page, p]));
 
+            function addPageWithCurrentState() {
+                const currentFont = doc.getFont();
+                const currentFontSize = doc.getFontSize();
+                const currentTextColor = doc.getTextColor();
+                doc.addPage();
+                cursorY = 50;
+                doc.setFont(currentFont.fontName, currentFont.fontStyle);
+                doc.setFontSize(currentFontSize);
+                if (typeof currentTextColor === 'string') {
+                    doc.setTextColor(currentTextColor.startsWith('#') ? currentTextColor : `#${currentTextColor}`);
+                }
+            }
+
             function ensureSpace(requiredHeight = 14) {
                 if (cursorY + requiredHeight > pageHeight - bottomMargin) {
-                    doc.addPage();
-                    cursorY = 50;
+                    addPageWithCurrentState();
                 }
             }
 
@@ -783,8 +795,7 @@
                     lineIndex += segment.length;
 
                     if (lineIndex < wrapped.length) {
-                        doc.addPage();
-                        cursorY = 50;
+                        addPageWithCurrentState();
                     }
                 }
 
@@ -911,8 +922,7 @@
             if (legalGroups.length > 0) {
                 cursorY += 20;
                 if (cursorY > doc.internal.pageSize.height - 150) {
-                    doc.addPage();
-                    cursorY = 50;
+                    addPageWithCurrentState();
                 }
                 
                 doc.setFont('helvetica', 'bold');

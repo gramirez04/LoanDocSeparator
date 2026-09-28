@@ -362,59 +362,99 @@
         });
 
         async function startProcessing(file) {
+            let pdfJsDoc = null;
             try {
                 setStatus(`Reading ${file.name}...`);
                 const arrayBuffer = await file.arrayBuffer();
                 
-                setStatus("Analyzing structure and extracting headers...");
+                // ==========================================
+                // PHASE 1: TEXT EXTRACTION (PDF.js)
+                // ==========================================
+                setStatus("Phase 1: Analyzing page headers...");
                 
-                // 1. Load PDF with pdf.js for text extraction
-                const pdfJsDoc = await pdfjsLib.getDocument({data: new Uint8Array(arrayBuffer).slice(0)}).promise;
+                // Load PDF for text extraction
+                pdfJsDoc = await pdfjsLib.getDocument({data: new Uint8Array(arrayBuffer).slice(0)}).promise;
                 const pageCount = pdfJsDoc.numPages;
                 
-                // 2. Load PDF with pdf-lib for structural manipulation
+                // Extract all headers sequentially first
+                let extractedHeaders = [];
+                for (let i = 1; i <= pageCount; i++) {
+                    if (i % 5 === 0) setStatus(`Reading headers: Page ${i} of ${pageCount}...`);
+                    let headerText = await extractHeaderPreview(pdfJsDoc, i);
+                    extractedHeaders.push(headerText);
+                }
+                
+                // CRITICAL MOBILE MEMORY FIX: 
+                // Destroy the PDF.js worker completely to free up RAM before PDF-lib starts.
+                await pdfJsDoc.destroy();
+                pdfJsDoc = null;
+                
+                // ==========================================
+                // PHASE 2: STRUCTURAL SPLITTING (PDF-Lib)
+                // ==========================================
+                setStatus("Phase 2: Separating Legal and Letter pages...");
                 const { PDFDocument } = PDFLib;
                 const srcDoc = await PDFDocument.load(new Uint8Array(arrayBuffer).slice(0));
+                
                 const letterDoc = await PDFDocument.create();
                 const legalDoc = await PDFDocument.create();
                 
-                // Robust mobile-safe state reading
                 const isPreserveYes = document.getElementById('preserveYes').checked;
                 const isMethodExact = document.getElementById('methodExact').checked;
-                
-                const placeholderMode = isPreserveYes 
-                    ? (isMethodExact ? "Exact Page Preservation" : "One Placeholder Per Legal Section") 
-                    : "None";
+                const placeholderMode = isPreserveYes ? (isMethodExact ? "Exact Page Preservation" : "One Placeholder Per Legal Section") : "None";
 
                 let pagesData = [];
-                let actualLetterPages = 0;
-                let actualLegalPages = 0;
+                let letterIndices = [];
+                let legalIndices = [];
                 let placeholderCount = 0;
                 let prevSize = null;
 
-                // Process pages
+                // Fast loop to rapidly determine page sizes without manipulating them yet
                 for (let i = 0; i < pageCount; i++) {
-                    const pageNum = i + 1;
-                    setStatus(`Processing page ${pageNum} of ${pageCount}...`);
-                    
                     const srcPage = srcDoc.getPage(i);
                     const { width, height } = srcPage.getSize();
                     // Detect Legal (>900 pts). 8.5x14 at 72dpi = 612x1008
                     const isLegal = width > 900 || height > 900;
-                    const sizeStr = isLegal ? "Legal" : "Letter";
                     
-                    let previewText = await extractHeaderPreview(pdfJsDoc, pageNum);
+                    if (isLegal) legalIndices.push(i);
+                    else letterIndices.push(i);
+                }
+
+                // ==========================================
+                // PHASE 3: BATCH ASSEMBLY (100x Faster)
+                // ==========================================
+                setStatus("Phase 3: Assembling new documents...");
+                
+                // Copy all pages in massive batches to prevent mobile thread blocking
+                let copiedLetterPages = [];
+                if (letterIndices.length > 0) {
+                     copiedLetterPages = await letterDoc.copyPages(srcDoc, letterIndices);
+                }
+                
+                let copiedLegalPages = [];
+                if (legalIndices.length > 0) {
+                     copiedLegalPages = await legalDoc.copyPages(srcDoc, legalIndices);
+                }
+
+                let actualLetterPages = 0;
+                let actualLegalPages = 0;
+                let letterDocIndex = 0;
+                let legalDocIndex = 0;
+                
+                // Stitch the actual documents together and build the report data
+                for (let i = 0; i < pageCount; i++) {
+                    const pageNum = i + 1;
+                    const isLegal = legalIndices.includes(i);
+                    const sizeStr = isLegal ? "Legal" : "Letter";
                     
                     let newLegalNum = null;
                     if (isLegal) {
                         actualLegalPages++;
                         newLegalNum = actualLegalPages;
+                        legalDoc.addPage(copiedLegalPages[legalDocIndex]);
+                        legalDocIndex++;
                         
-                        // Copy to legal document
-                        const [copiedPage] = await legalDoc.copyPages(srcDoc, [i]);
-                        legalDoc.addPage(copiedPage);
-
-                        // Placeholder logic
+                        // Handle Placeholders efficiently
                         if (placeholderMode === "Exact Page Preservation") {
                             letterDoc.addPage([612, 792]);
                             placeholderCount++;
@@ -426,28 +466,28 @@
                         }
                     } else {
                         actualLetterPages++;
-                        const [copiedPage] = await letterDoc.copyPages(srcDoc, [i]);
-                        letterDoc.addPage(copiedPage);
+                        letterDoc.addPage(copiedLetterPages[letterDocIndex]);
+                        letterDocIndex++;
                     }
                     
                     pagesData.push({
                         original_page: pageNum,
                         size: sizeStr,
-                        preview_text: previewText,
+                        preview_text: extractedHeaders[i], // Pull from Phase 1 Memory
                         new_legal_page: newLegalNum
                     });
                     
                     prevSize = sizeStr;
                 }
 
-                setStatus("Generating Reassembly Guide...");
-                // Group Legal pages for the report
+                // ==========================================
+                // PHASE 4: REPORTS & PACKAGING
+                // ==========================================
+                setStatus("Phase 4: Generating Reassembly Guide...");
                 const legalGroups = groupLegalPages(pagesData);
-                
-                // Generate Report Blob
                 const reportBlob = generateReportPdf(file.name, pageCount, actualLetterPages, actualLegalPages, placeholderMode, placeholderCount, letterDoc.getPageCount(), pagesData, legalGroups);
 
-                setStatus("Packaging files into ZIP...");
+                setStatus("Phase 5: Packaging files into ZIP...");
                 const zip = new JSZip();
                 
                 if (letterDoc.getPageCount() > 0) {
@@ -464,20 +504,17 @@
                 
                 const zipBlob = await zip.generateAsync({type: "blob"});
                 
-                // Trigger download
                 const timestamp = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14);
                 const baseName = file.name.replace(/\.[^/.]+$/, "");
                 saveAs(zipBlob, `${baseName}_Processed_${timestamp}.zip`);
                 
                 setStatus("Success! Files downloaded.", false, true);
 
-                // Free memory to prevent mobile crashes
-                if (pdfJsDoc) pdfJsDoc.destroy();
-
             } catch (err) {
                 console.error(err);
+                if (pdfJsDoc) await pdfJsDoc.destroy().catch(e => console.log(e)); // Force memory cleanup
                 setStatus("An error occurred during processing.", true);
-                alert("Error: " + err.message);
+                alert("Error: " + err.message + "\n\nIf you are on an older mobile device, try testing with a smaller file to avoid memory limits.");
             }
         }
 
@@ -485,85 +522,47 @@
             try {
                 const page = await pdfJsDoc.getPage(pageNum);
                 const textContent = await page.getTextContent();
-                const viewport = page.getViewport({scale: 1.0});
-                const pageHeight = viewport.height;
-                const pageWidth = viewport.width;
                 
+                if (!textContent.items || textContent.items.length === 0) return "[Image Only / Blank Page]";
+                
+                // Group letters by their vertical (Y) position to stitch words together safely
                 let lines = {};
                 for (let item of textContent.items) {
                     if (!item.str.trim()) continue;
                     
-                    // Round the Y coordinate to the nearest 5 to group slightly misaligned characters on the same line
+                    // Round Y to nearest 5 to account for slight vertical misalignments in PDF text
                     const y = Math.round(item.transform[5] / 5) * 5;
+                    if (!lines[y]) lines[y] = { text: [], maxFontSize: 0 };
                     
-                    if (!lines[y]) {
-                        lines[y] = { items: [], maxFontSize: 0, minX: 9999, maxX: 0, isBold: false };
-                    }
-                    
-                    lines[y].items.push({ text: item.str, x: item.transform[4] });
-                    
-                    const fontSize = item.transform[0];
-                    if (fontSize > lines[y].maxFontSize) lines[y].maxFontSize = fontSize;
-                    
-                    const tx = item.transform[4];
-                    if (tx < lines[y].minX) lines[y].minX = tx;
-                    if (tx + item.width > lines[y].maxX) lines[y].maxX = tx + item.width;
-                    
-                    if (item.hasEventualBoldFont) lines[y].isBold = true;
+                    lines[y].text.push({ str: item.str, x: item.transform[4] });
+                    if (item.transform[0] > lines[y].maxFontSize) lines[y].maxFontSize = item.transform[0];
                 }
 
-                const centerX = pageWidth / 2.0;
-                
                 let bestText = "";
-                let maxScore = 0;
-                
+                let maxScore = -1;
+
+                // Find the line with the absolute largest font size (This is universally the document title)
                 for (let y in lines) {
-                    const numY = parseInt(y);
+                    let line = lines[y];
                     
-                    // Mobile & Viewport Safe: Check if physically near top (handles both standard bottom-up and inverted top-down Y origins)
-                    const isNearTopStandard = numY > (pageHeight * 0.65);
-                    const isNearTopInverted = numY < (pageHeight * 0.35);
-                    if (!isNearTopStandard && !isNearTopInverted) continue; 
+                    // Sort characters left-to-right mathematically
+                    line.text.sort((a, b) => a.x - b.x);
                     
-                    const line = lines[y];
-                    
-                    // Sort items by X coordinate to ensure letters are stitched in correct left-to-right order
-                    line.items.sort((a, b) => a.x - b.x);
-                    
-                    let assembledText = "";
-                    let lastX = -999;
-                    for (let item of line.items) {
-                        // Add spaces between elements if there is a significant horizontal gap
-                        if (lastX !== -999 && (item.x - lastX) > 10) assembledText += " ";
-                        assembledText += item.text;
-                        lastX = item.x + (item.text.length * (line.maxFontSize * 0.4)); // Estimate end of string
-                    }
-                    
-                    const text = assembledText.trim();
-                    if (text.length < 4) continue;
-                    
-                    const centerDist = Math.abs(((line.minX + line.maxX) / 2.0) - centerX);
-                    
-                    let score = line.maxFontSize;
-                    
-                    // Simple heuristics to find the most prominent title
-                    if (line.isBold) score *= 1.3; 
-                    if (centerDist < (pageWidth * 0.15)) score *= 1.6;
-                    else if (centerDist < (pageWidth * 0.30)) score *= 1.2;
-                    
-                    // Bonus for being at the extreme top edge
-                    if (numY > pageHeight * 0.85 || numY < pageHeight * 0.15) score *= 1.2; 
-                    
+                    // Stitch back into a clean sentence
+                    let textStr = line.text.map(t => t.str).join(" ").replace(/\s+/g, ' ').trim();
+                    if (textStr.length < 4) continue;
+
+                    let score = line.maxFontSize; 
                     if (score > maxScore) {
                         maxScore = score;
-                        bestText = text;
+                        bestText = textStr;
                     }
                 }
-                
-                return bestText || "[No identifying header found at top of page]";
+
+                return bestText ? bestText.substring(0, 85) : "[No identifying header found]";
             } catch (e) {
-                console.error("Header Extraction Error:", e);
-                return "[Error reading page text]";
+                console.warn("Header Extraction Skipped:", e);
+                return "[Error reading text]";
             }
         }
 

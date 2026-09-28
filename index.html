@@ -227,6 +227,7 @@
         const BETA_EXPIRATION_DATE = new Date("2026-10-03T23:59:59"); // Expires Oct 3, 2026
         // Last-published timestamp is fetched dynamically from the server's Last-Modified
         // header so it auto-updates every time the code is published — no manual edit needed.
+        const LAST_UPDATED = "Sept 28, 2026, 11:40:00 AM";
         let hwid = generateMockHWID();
         let isSessionUnlocked = false; // Requires password every time the app opens
         let currentDownloadUrl = null;
@@ -471,6 +472,8 @@
                 const rawBuffer = await getFileArrayBuffer(file);
                 const arrayBuffer = rawBuffer.slice(0);
                 const arrayBuffer2 = rawBuffer.slice(0);
+                const arrayBuffer = await getFileArrayBuffer(file);
+                const arrayBuffer2 = await getFileArrayBuffer(file);
 
                 // ==========================================
                 // PHASE 1: TEXT EXTRACTION (PDF.js)
@@ -532,6 +535,10 @@
                         }
                     }
                     addDiag(`Page ${i+1}: ${width.toFixed(0)}x${height.toFixed(0)} → ${pageClass.type} (conf ${pageClass.confidence.toFixed(2)})`);
+                            console.log(`Page ${i+1}: PDF-lib dims invalid (${width}x${height}), using PDF.js fallback (${fb.width}x${fb.height}) → ${pageClass.type}`);
+                        }
+                    }
+                    console.log(`Page ${i+1}: ${width}x${height} → ${pageClass.type} (conf ${pageClass.confidence.toFixed(2)})`);
                     pageClassifications.push(pageClass);
 
                     const isLegal = pageClass.type === 'Legal';
@@ -989,6 +996,7 @@
             checkLicensingState();
             initConnectionGuard();
             loadLastPublished();
+            document.getElementById('versionTimestamp').textContent = 'Last Published: ' + LAST_UPDATED;
         });
 
         // --- Connection Guard Logic ---
@@ -1023,3 +1031,4 @@
     </script>
 </body>
 </html>
+

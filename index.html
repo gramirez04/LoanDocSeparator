@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LoanDocSeparator by SigningLedger</title>
+    <meta name="app-build-time-utc" content="2026-09-28T20:58:43.369Z">
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -217,7 +218,7 @@
         const BETA_PASSWORD = "SLTRIAL";
         const BETA_EXPIRATION_DATE = new Date("2026-10-03T23:59:59"); // Expires Oct 3, 2026
         const APP_BUILD_TIME_UTC = resolveBuildTimestamp();
-        const APP_BUILD_DATE = parseBuildTimestamp(APP_BUILD_TIME_UTC) || new Date();
+        const APP_BUILD_DATE = parseBuildTimestamp(APP_BUILD_TIME_UTC);
         let hwid = generateMockHWID();
         let isSessionUnlocked = false; // Requires password every time the app opens
         let currentDownloadUrl = null;
@@ -354,18 +355,10 @@
         }
 
         function resolveBuildTimestamp() {
-            const globalValue = typeof window.__APP_BUILD_TIME_UTC === 'string'
-                ? window.__APP_BUILD_TIME_UTC.trim()
-                : '';
             const metaTag = document.querySelector('meta[name="app-build-time-utc"]');
             const metaValue = metaTag ? String(metaTag.content || '').trim() : '';
-            const dataValue = document.documentElement && document.documentElement.dataset
-                ? String(document.documentElement.dataset.buildTimeUtc || '').trim()
-                : '';
-            const fallbackValue = String(document.lastModified || '').trim();
-            const candidate = globalValue || metaValue || dataValue || fallbackValue;
-            const parsed = parseBuildTimestamp(candidate);
-            return parsed ? parsed.toISOString() : new Date().toISOString();
+            const parsed = parseBuildTimestamp(metaValue);
+            return parsed ? parsed.toISOString() : '';
         }
 
         function formatBuildTimestampForDisplay(dateValue) {
@@ -390,19 +383,42 @@
         function renderAppVersionLabel() {
             const el = document.getElementById('appVersionLabel');
             if (!el) return;
+            if (!APP_BUILD_DATE) {
+                el.textContent = 'Last Updated: Build timestamp not set';
+                return;
+            }
             el.textContent = `Last Updated: ${formatBuildTimestampForDisplay(APP_BUILD_DATE)}`;
         }
 
         function getPublishedBuildTimestamp() {
+            if (!APP_BUILD_DATE) return 'BUILD_TIMESTAMP_NOT_SET';
             const pad = value => String(value).padStart(2, '0');
             return `${APP_BUILD_DATE.getUTCFullYear()}${pad(APP_BUILD_DATE.getUTCMonth() + 1)}${pad(APP_BUILD_DATE.getUTCDate())}${pad(APP_BUILD_DATE.getUTCHours())}${pad(APP_BUILD_DATE.getUTCMinutes())}`;
         }
 
-        function getFileArrayBuffer(file) {
+        async function getFileArrayBuffer(file) {
+            if (!file) throw new Error('No file was selected. Please choose a PDF and try again.');
+
+            if (typeof file.arrayBuffer === 'function') {
+                try {
+                    const directBuffer = await file.arrayBuffer();
+                    if (directBuffer && directBuffer.byteLength > 0) return directBuffer;
+                } catch (e) {
+                    console.warn('Direct file.arrayBuffer() failed, falling back to FileReader.', e);
+                }
+            }
+
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
-                reader.onload = () => resolve(reader.result);
-                reader.onerror = () => reject(reader.error || new Error('Unable to read selected file.'));
+                reader.onload = () => {
+                    const result = reader.result;
+                    if (!result || !result.byteLength) {
+                        reject(new Error('The selected file could not be read by this browser. Please re-download the PDF to local storage and retry.'));
+                        return;
+                    }
+                    resolve(result);
+                };
+                reader.onerror = () => reject(reader.error || new Error('Unable to read selected file. Please move the PDF to local storage and try again.'));
                 reader.readAsArrayBuffer(file);
             });
         }
@@ -428,6 +444,122 @@
             }
             const existingDl = document.getElementById('mobileDlBtn');
             if (existingDl) existingDl.remove();
+        }
+
+        function triggerTemporaryBlobDownload(blob, fileName) {
+            const blobUrl = URL.createObjectURL(blob);
+            currentDownloadUrl = blobUrl;
+            const a = document.createElement('a');
+            a.href = blobUrl;
+            a.download = fileName;
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+                try { URL.revokeObjectURL(blobUrl); } catch (e) { console.warn('Unable to revoke temporary blob URL.', e); }
+                if (currentDownloadUrl === blobUrl) currentDownloadUrl = null;
+                a.remove();
+            }, 60000);
+        }
+
+        async function tryMobileShare(blob, fileName) {
+            if (typeof navigator === 'undefined' || typeof navigator.share !== 'function' || typeof File !== 'function') {
+                return { shared: false };
+            }
+
+            const shareFile = new File([blob], fileName, { type: 'application/zip' });
+            const sharePayload = {
+                title: 'LoanDocSeparator Output',
+                text: 'Save this processed ZIP file.',
+                files: [shareFile]
+            };
+
+            if (typeof navigator.canShare === 'function' && !navigator.canShare({ files: [shareFile] })) {
+                return { shared: false };
+            }
+
+            try {
+                await navigator.share(sharePayload);
+                return { shared: true };
+            } catch (e) {
+                if (e && e.name === 'AbortError') return { shared: false, cancelled: true };
+                return { shared: false, error: e };
+            }
+        }
+
+        function renderDownloadAction(actionContainer, zipBlob, fileName, mobileMode) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.id = 'mobileDlBtn';
+            button.className = 'mt-6 block w-full px-6 py-4 bg-brandGreen hover:bg-green-700 text-white font-extrabold rounded shadow-lg border-2 border-green-600 animate-pulse text-center text-lg transition-colors';
+            button.textContent = mobileMode ? '⬇️ TAP HERE TO SAVE ZIP ⬇️' : '⬇️ CLICK HERE IF DOWNLOAD DID NOT START ⬇️';
+            button.addEventListener('click', async () => {
+                button.disabled = true;
+                try {
+                    if (mobileMode) {
+                        const shareResult = await tryMobileShare(zipBlob, fileName);
+                        if (shareResult.shared) {
+                            setStatus('Success! File shared/saved from the native menu.', false, true);
+                            return;
+                        }
+                        if (shareResult.cancelled) {
+                            setStatus('Save cancelled. Tap the green button again to retry.', true);
+                            return;
+                        }
+                    }
+                    triggerTemporaryBlobDownload(zipBlob, fileName);
+                    setStatus('Download started. If not saved, tap the button again.', false, true);
+                } catch (e) {
+                    console.error('Download action failed.', e);
+                    setStatus('Could not save ZIP automatically. Move file to local storage and retry.', true);
+                    alert('Unable to save the ZIP file automatically.\n\nTry this:\n1) Move the source PDF to your device local storage.\n2) Reprocess the file.\n3) Tap the green save button again.');
+                } finally {
+                    button.disabled = false;
+                }
+            });
+            actionContainer.appendChild(button);
+        }
+
+        function validateClassificationAudit(pageCount, classificationAudit) {
+            if (!Array.isArray(classificationAudit) || classificationAudit.length !== pageCount) {
+                throw new Error(`Classification audit failed: expected ${pageCount} entries, found ${classificationAudit?.length || 0}.`);
+            }
+
+            let letterCount = 0;
+            let legalCount = 0;
+            const seenPages = new Set();
+            for (const entry of classificationAudit) {
+                if (!Number.isInteger(entry.original_page) || entry.original_page < 1 || entry.original_page > pageCount) {
+                    throw new Error(`Classification audit failed: invalid original page reference (${entry.original_page}).`);
+                }
+                if (seenPages.has(entry.original_page)) {
+                    throw new Error(`Classification audit failed: duplicate page entry (${entry.original_page}).`);
+                }
+                seenPages.add(entry.original_page);
+                if (entry.resolved_type === 'Letter') letterCount++;
+                else if (entry.resolved_type === 'Legal') legalCount++;
+                else throw new Error(`Classification audit failed: unresolved page type at page ${entry.original_page}.`);
+            }
+
+            if ((letterCount + legalCount) !== pageCount) {
+                throw new Error(`Classification audit failed: resolved Letter (${letterCount}) + Legal (${legalCount}) does not equal source count (${pageCount}).`);
+            }
+            return { letterCount, legalCount };
+        }
+
+        function mapProcessingError(err, mobileMode) {
+            const originalMessage = (err && err.message) ? err.message : 'Unknown processing error.';
+            const lower = originalMessage.toLowerCase();
+            if (lower.includes('unable to read selected file') || lower.includes('could not be read')) {
+                return `Unable to read the selected PDF.\n\n${mobileMode ? 'On mobile, copy the file to local device storage (not cloud preview) and try again.' : 'Please reopen the PDF from a local folder and retry.'}`;
+            }
+            if (lower.includes('unable to classify page size')) {
+                return 'One or more pages could not be classified as Letter or Legal.\n\nPlease verify the PDF is not rotated/scaled unexpectedly and retry.';
+            }
+            if (lower.includes('classification audit failed') || lower.includes('page accounting validation failed')) {
+                return 'Split integrity check failed.\n\nNo files were exported. Please retry with the same file; if it repeats, share the exact PDF for review.';
+            }
+            return `Processing failed: ${originalMessage}\n\nTry re-downloading the PDF, saving it locally, and processing again.`;
         }
 
         function classifyPageDimensions(width, height) {
@@ -480,17 +612,23 @@
             const libClass = pdfLibClass || { type: 'Unknown', confidence: 0 };
             const jsClass = pdfJsClass || { type: 'Unknown', confidence: 0 };
 
-            if (libClass.type === 'Unknown' && jsClass.type !== 'Unknown') return jsClass;
-            if (jsClass.type === 'Unknown' && libClass.type !== 'Unknown') return libClass;
+            if (libClass.type === 'Unknown' && jsClass.type !== 'Unknown') return { ...jsClass, decidedBy: 'pdfjs' };
+            if (jsClass.type === 'Unknown' && libClass.type !== 'Unknown') return { ...libClass, decidedBy: 'pdflib' };
 
             if (libClass.type !== jsClass.type) {
                 if (libClass.type === 'Legal' || jsClass.type === 'Legal') {
-                    return (libClass.type === 'Legal') ? libClass : jsClass;
+                    return (libClass.type === 'Legal')
+                        ? { ...libClass, decidedBy: 'pdflib-priority-legal' }
+                        : { ...jsClass, decidedBy: 'pdfjs-priority-legal' };
                 }
-                return (jsClass.confidence > libClass.confidence) ? jsClass : libClass;
+                return (jsClass.confidence > libClass.confidence)
+                    ? { ...jsClass, decidedBy: 'pdfjs-confidence' }
+                    : { ...libClass, decidedBy: 'pdflib-confidence' };
             }
 
-            return (jsClass.confidence > libClass.confidence) ? jsClass : libClass;
+            return (jsClass.confidence > libClass.confidence)
+                ? { ...jsClass, decidedBy: 'pdfjs-confidence' }
+                : { ...libClass, decidedBy: 'pdflib-confidence' };
         }
 
         function isMobileBrowser() {
@@ -653,6 +791,7 @@
             let extractedHeaders = [];
             let pdfJsPageDimensions = [];
             let pageClassifications = [];
+            let classificationAudit = [];
             let pagesData = [];
             try {
                 const mobileMode = isMobileBrowser();
@@ -710,6 +849,25 @@
                         : { type: 'Unknown', confidence: 0, ratio: 0, width: jsDims?.width, height: jsDims?.height, reason: 'Missing PDF.js dimensions' };
                     const pageClass = resolvePageClassification(libPageClass, jsPageClass);
                     pageClassifications.push(pageClass);
+                    classificationAudit.push({
+                        original_page: i + 1,
+                        pdf_lib_type: libPageClass.type,
+                        pdf_lib_confidence: libPageClass.confidence,
+                        pdf_lib_ratio: libPageClass.ratio,
+                        pdf_lib_width: libPageClass.width,
+                        pdf_lib_height: libPageClass.height,
+                        pdf_js_type: jsPageClass.type,
+                        pdf_js_confidence: jsPageClass.confidence,
+                        pdf_js_ratio: jsPageClass.ratio,
+                        pdf_js_width: jsPageClass.width,
+                        pdf_js_height: jsPageClass.height,
+                        resolved_type: pageClass.type,
+                        resolved_confidence: pageClass.confidence,
+                        resolved_ratio: pageClass.ratio,
+                        resolved_width: pageClass.width,
+                        resolved_height: pageClass.height,
+                        resolution_source: pageClass.decidedBy || 'unknown'
+                    });
 
                     const isLegal = pageClass.type === 'Legal';
                     if (isLegal) {
@@ -733,6 +891,11 @@
                         .map(p => `#${p.page} (${p.reason}; ${Number(p.width || 0).toFixed(2)}x${Number(p.height || 0).toFixed(2)})`)
                         .join(', ');
                     throw new Error(`Unable to classify page size for source page(s): ${pagesList}. Processing stopped for review.`);
+                }
+
+                const auditCounts = validateClassificationAudit(pageCount, classificationAudit);
+                if (auditCounts.letterCount !== letterIndices.length || auditCounts.legalCount !== legalIndices.length) {
+                    throw new Error(`Classification audit failed: resolved counts (Letter ${auditCounts.letterCount}, Legal ${auditCounts.legalCount}) do not match index counts (Letter ${letterIndices.length}, Legal ${legalIndices.length}).`);
                 }
 
                 let actualLetterPages = 0;
@@ -879,48 +1042,48 @@
                 }
                 
                 zip.file("3_Reassembly_Guide.pdf", reportBlob);
+                zip.file("4_Page_Classification_Audit.json", JSON.stringify({
+                    file_name: file.name,
+                    processed_at_utc: new Date().toISOString(),
+                    source_page_count: pageCount,
+                    classified_letter_pages: letterIndices.length,
+                    classified_legal_pages: legalIndices.length,
+                    placeholder_mode: placeholderMode,
+                    pages: classificationAudit
+                }, null, 2));
                 
                 const zipBlob = await zip.generateAsync(mobileMode ? { type: 'blob', compression: 'STORE' } : { type: 'blob' });
                 const timestamp = getPublishedBuildTimestamp();
                 const baseName = file.name.replace(/\.[^/.]+$/, '');
                 const fileName = `${baseName}_Processed_${timestamp}.zip`;
-                
-                // Safari and mobile browsers can block forced downloads, so provide a visible click target.
-                const blobUrl = URL.createObjectURL(zipBlob);
-                currentDownloadUrl = blobUrl;
+
                 const actionContainer = document.getElementById('processBtn').parentElement;
-                
-                const dlButtonHtml = `
-                    <a href="${blobUrl}" download="${fileName}" id="mobileDlBtn" class="mt-6 block w-full px-6 py-4 bg-brandGreen hover:bg-green-700 text-white font-extrabold rounded shadow-lg border-2 border-green-600 animate-pulse text-center text-lg transition-colors">
-                        ⬇️ TAP HERE TO DOWNLOAD ZIP ⬇️
-                    </a>
-                `;
-                
-                const tempDiv = document.createElement('div');
-                tempDiv.innerHTML = dlButtonHtml;
-                let mobileLink = tempDiv.firstElementChild;
-                if (!mobileLink) {
-                    mobileLink = document.createElement('a');
-                    mobileLink.href = blobUrl;
-                    mobileLink.download = fileName;
-                    mobileLink.id = 'mobileDlBtn';
-                    mobileLink.className = 'mt-6 block w-full px-6 py-4 bg-brandGreen hover:bg-green-700 text-white font-extrabold rounded shadow-lg border-2 border-green-600 animate-pulse text-center text-lg transition-colors';
-                    mobileLink.textContent = '⬇️ TAP HERE TO DOWNLOAD ZIP ⬇️';
-                }
-                actionContainer.appendChild(mobileLink);
+                renderDownloadAction(actionContainer, zipBlob, fileName, mobileMode);
 
                 if (!mobileMode) {
-                    try { saveAs(zipBlob, fileName); } catch (e) { console.warn('Auto-download suppressed.', e); }
-                    setStatus('Success! Download started. If blocked, use the green button.', false, true);
+                    try {
+                        saveAs(zipBlob, fileName);
+                        setStatus('Success! Download started. If blocked, use the green button.', false, true);
+                    } catch (e) {
+                        console.warn('Auto-download suppressed.', e);
+                        setStatus('Success! Click the green button to save your ZIP.', false, true);
+                    }
                 } else {
-                    setStatus('Success! Tap the green button above to save.', false, true);
+                    const shareResult = await tryMobileShare(zipBlob, fileName);
+                    if (shareResult.shared) {
+                        setStatus('Success! Shared/saved using your device menu.', false, true);
+                    } else {
+                        setStatus('Success! Tap the green button above to save.', false, true);
+                    }
                 }
 
             } catch (err) {
                 console.error(err);
                 if (pdfJsDoc) await pdfJsDoc.destroy().catch(e => console.log(e));
-                setStatus('An error occurred during processing.', true);
-                alert('Error: ' + err.message);
+                const mobileMode = isMobileBrowser();
+                const userMessage = mapProcessingError(err, mobileMode);
+                setStatus(mobileMode ? 'Processing failed. See recovery steps in alert.' : 'Processing failed. Check alert for details.', true);
+                alert(userMessage);
             }
         }
 

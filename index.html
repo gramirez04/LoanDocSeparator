@@ -372,23 +372,14 @@
                 return { type: 'Unknown', confidence: 0, ratio: 0, width, height, reason: 'Invalid page dimensions' };
             }
 
-            function isMobileBrowser() {
-                const ua = navigator.userAgent || '';
-                const touchMac = /Macintosh/i.test(ua) && navigator.maxTouchPoints > 1;
-                return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua) || touchMac;
-            }
-
-            function yieldToUI() {
-                return new Promise(resolve => setTimeout(resolve, 0));
-            }
-
             const longEdge = Math.max(width, height);
             const shortEdge = Math.min(width, height);
             const ratio = longEdge / shortEdge;
             const letterTarget = 11 / 8.5;
             const legalTarget = 14 / 8.5;
-            const ratioTolerance = 0.12;
-            const dominanceMargin = 0.045;
+            const letterLong = 792;
+            const legalLong = 1008;
+            const ratioTolerance = 0.16;
 
             const exactLetter = (Math.abs(width - 612) <= 36 && Math.abs(height - 792) <= 36) ||
                 (Math.abs(width - 792) <= 36 && Math.abs(height - 612) <= 36);
@@ -400,29 +391,36 @@
 
             const letterDiff = Math.abs(ratio - letterTarget);
             const legalDiff = Math.abs(ratio - legalTarget);
+            const letterLongDiff = Math.abs(longEdge - letterLong);
+            const legalLongDiff = Math.abs(longEdge - legalLong);
 
-            if (letterDiff <= ratioTolerance && legalDiff <= ratioTolerance) {
-                if (letterDiff <= legalDiff) {
-                    return { type: 'Letter', confidence: Math.max(0.45, 1 - (letterDiff / ratioTolerance)), ratio, width, height };
-                }
+            // Deterministic split rules for mixed-page packages.
+            if (longEdge >= 900 && legalLongDiff <= (letterLongDiff + 24)) {
+                return { type: 'Legal', confidence: Math.max(0.6, 1 - (legalLongDiff / 300)), ratio, width, height };
+            }
+
+            if (ratio >= 1.47) {
+                return { type: 'Legal', confidence: Math.max(0.6, 1 - (legalDiff / ratioTolerance)), ratio, width, height };
+            }
+            if (ratio <= 1.40) {
+                return { type: 'Letter', confidence: Math.max(0.6, 1 - (letterDiff / ratioTolerance)), ratio, width, height };
+            }
+
+            // Best-match fallback for borderline or scaled pages.
+            if (legalDiff < letterDiff) {
                 return { type: 'Legal', confidence: Math.max(0.45, 1 - (legalDiff / ratioTolerance)), ratio, width, height };
             }
+            return { type: 'Letter', confidence: Math.max(0.45, 1 - (letterDiff / ratioTolerance)), ratio, width, height };
+        }
 
-            if (letterDiff <= ratioTolerance && (letterDiff + dominanceMargin) < legalDiff) {
-                return { type: 'Letter', confidence: Math.max(0.5, 1 - (letterDiff / ratioTolerance)), ratio, width, height };
-            }
-            if (legalDiff <= ratioTolerance && (legalDiff + dominanceMargin) < letterDiff) {
-                return { type: 'Legal', confidence: Math.max(0.5, 1 - (legalDiff / ratioTolerance)), ratio, width, height };
-            }
+        function isMobileBrowser() {
+            const ua = navigator.userAgent || '';
+            const touchMac = /Macintosh/i.test(ua) && navigator.maxTouchPoints > 1;
+            return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua) || touchMac;
+        }
 
-            return {
-                type: 'Unknown',
-                confidence: 0,
-                ratio,
-                width,
-                height,
-                reason: `Unrecognized page ratio (${ratio.toFixed(3)})`
-            };
+        function yieldToUI() {
+            return new Promise(resolve => setTimeout(resolve, 0));
         }
 
         function validateClassifiedPageAccounting(pageCount, pagesData, classifiedLetterCount, classifiedLegalCount, actualLetterPages, actualLegalPages, placeholderMode, placeholderCount, expectedFinalLetterPagesBuilt, finalLetterCount, finalLegalCount, placeholderOutputPagesCreated) {

@@ -1000,6 +1000,8 @@
             const disclaimerText = "The document header shown below is provided only as a reference. ALWAYS use the Original Page Number and 'Insert After' Number as the authoritative instruction for reassembly. The placeholder pages are only there to preserve position.";
             writeWrappedText(disclaimerText, doc.internal.pageSize.width - (marginX * 2), 12, 15);
             doc.setTextColor(0, 0, 0);
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(10);
 
             doc.setFont('helvetica', 'bold');
             doc.setFontSize(14);

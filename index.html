@@ -168,6 +168,13 @@
             <div class="text-center mt-4">
                 <p id="statusLabel" class="text-sm text-slate-500 font-medium h-5">Ready</p>
             </div>
+            <!-- Diagnostic Log (visible on mobile so users can see what happened) -->
+            <div id="diagnosticLog" class="mt-4 hidden">
+                <div class="bg-slate-50 border border-slate-200 rounded p-3 max-h-56 overflow-y-auto text-left">
+                    <p class="text-xs font-bold text-slate-700 mb-1">Processing Details:</p>
+                    <div id="diagnosticContent" class="text-[11px] text-slate-600 font-mono space-y-0.5"></div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -342,7 +349,8 @@
         }
 
         function getFileArrayBuffer(file) {
-            if (file.arrayBuffer) return file.arrayBuffer();
+            // Always use FileReader — more reliable on iOS Safari than file.arrayBuffer(),
+            // which can return the same internal buffer reference on repeated calls.
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
                 reader.onload = () => resolve(reader.result);
@@ -358,6 +366,26 @@
             el.textContent = msg;
             el.className = "text-sm font-medium h-5 mt-2 " + 
                 (isError ? "text-red-600" : isSuccess ? "text-brandGreen" : "text-brandBlue");
+        }
+
+        function addDiag(msg) {
+            console.log('[DIAG] ' + msg);
+            const log = document.getElementById('diagnosticLog');
+            const content = document.getElementById('diagnosticContent');
+            if (log && content) {
+                log.classList.remove('hidden');
+                const line = document.createElement('div');
+                line.textContent = msg;
+                content.appendChild(line);
+                content.scrollTop = content.scrollHeight;
+            }
+        }
+
+        function clearDiag() {
+            const log = document.getElementById('diagnosticLog');
+            const content = document.getElementById('diagnosticContent');
+            if (log) log.classList.add('hidden');
+            if (content) content.innerHTML = '';
         }
 
         function triggerFileSelect() {
@@ -426,6 +454,8 @@
 
         async function startProcessing(file) {
             clearPreviousMobileDownload();
+            clearDiag();
+            addDiag(`File: ${file.name} (${(file.size / 1024).toFixed(0)} KB)`);
             let pdfJsDoc = null;
             try {
                 setStatus(`Reading ${file.name}...`);
@@ -433,8 +463,13 @@
                 // (text extraction) and one for PDF-lib (page splitting). On iOS Safari,
                 // PDF.js's worker can detach/corrupt a shared buffer before PDF-lib reads it,
                 // causing getSize() to return invalid dimensions and misclassify every page.
-                const arrayBuffer = await getFileArrayBuffer(file);
-                const arrayBuffer2 = await getFileArrayBuffer(file);
+                // Read the file ONCE, then create two true independent copies via
+                // ArrayBuffer.slice(0). On iOS Safari, calling file.arrayBuffer()
+                // twice can return the same buffer; when PDF.js transfers it to its
+                // worker the original is detached, corrupting the copy PDF-lib needs.
+                const rawBuffer = await getFileArrayBuffer(file);
+                const arrayBuffer = rawBuffer.slice(0);
+                const arrayBuffer2 = rawBuffer.slice(0);
 
                 // ==========================================
                 // PHASE 1: TEXT EXTRACTION (PDF.js)
@@ -442,6 +477,7 @@
                 setStatus("Phase 1: Analyzing page headers...");
                 pdfJsDoc = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer).slice(0) }).promise;
                 const pageCount = pdfJsDoc.numPages;
+                addDiag(`PDF.js loaded: ${pageCount} pages`);
 
                 let extractedHeaders = [];
                 let pdfJsPageDimensions = [];
@@ -464,6 +500,7 @@
                 setStatus("Phase 2: Separating Legal and Letter pages...");
                 const { PDFDocument } = PDFLib;
                 const srcDoc = await PDFDocument.load(new Uint8Array(arrayBuffer2).slice(0));
+                addDiag(`PDF-lib loaded successfully`);
                 
                 const letterDoc = await PDFDocument.create();
                 const legalDoc = await PDFDocument.create();
@@ -490,10 +527,10 @@
                         const fb = pdfJsPageDimensions[i];
                         if (fb.width > 0 && fb.height > 0) {
                             pageClass = classifyPageDimensions(fb.width, fb.height);
-                            console.log(`Page ${i+1}: PDF-lib dims invalid (${width}x${height}), using PDF.js fallback (${fb.width}x${fb.height}) → ${pageClass.type}`);
+                            addDiag(`Page ${i+1}: PDF-lib dims invalid, fallback to PDF.js (${fb.width.toFixed(0)}x${fb.height.toFixed(0)}) → ${pageClass.type}`);
                         }
                     }
-                    console.log(`Page ${i+1}: ${width}x${height} → ${pageClass.type} (conf ${pageClass.confidence.toFixed(2)})`);
+                    addDiag(`Page ${i+1}: ${width.toFixed(0)}x${height.toFixed(0)} → ${pageClass.type} (conf ${pageClass.confidence.toFixed(2)})`);
                     pageClassifications.push(pageClass);
 
                     const isLegal = pageClass.type === 'Legal';
@@ -572,6 +609,8 @@
                     
                     prevSize = sizeStr;
                 }
+
+                addDiag(`Split complete: ${actualLetterPages} Letter, ${actualLegalPages} Legal pages`);
 
                 // ==========================================
                 // PHASE 4: REPORTS & PACKAGING
@@ -656,9 +695,9 @@
 
             } catch (err) {
                 console.error(err);
+                addDiag(`ERROR: ${err.message}`);
                 if (pdfJsDoc) await pdfJsDoc.destroy().catch(e => console.log(e));
-                setStatus('An error occurred during processing.', true);
-                alert('Error: ' + err.message);
+                setStatus('Error: ' + err.message, true);
             }
         }
 

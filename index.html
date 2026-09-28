@@ -216,7 +216,8 @@
         const ADMIN_MASTER_KEY = "SL-ADMIN-GERMAN-2026";
         const BETA_PASSWORD = "SLTRIAL";
         const BETA_EXPIRATION_DATE = new Date("2026-10-03T23:59:59"); // Expires Oct 3, 2026
-        const APP_BUILD_VERSION = "2026-09-28 05:58 UTC";
+        const APP_BUILD_TIME_UTC = resolveBuildTimestamp();
+        const APP_BUILD_DATE = parseBuildTimestamp(APP_BUILD_TIME_UTC) || new Date();
         let hwid = generateMockHWID();
         let isSessionUnlocked = false; // Requires password every time the app opens
         let currentDownloadUrl = null;
@@ -346,17 +347,55 @@
                 (isError ? "text-red-600" : isSuccess ? "text-brandGreen" : "text-brandBlue");
         }
 
+        function parseBuildTimestamp(value) {
+            if (!value) return null;
+            const parsed = value instanceof Date ? value : new Date(value);
+            return Number.isNaN(parsed.getTime()) ? null : parsed;
+        }
+
+        function resolveBuildTimestamp() {
+            const globalValue = typeof window.__APP_BUILD_TIME_UTC === 'string'
+                ? window.__APP_BUILD_TIME_UTC.trim()
+                : '';
+            const metaTag = document.querySelector('meta[name="app-build-time-utc"]');
+            const metaValue = metaTag ? String(metaTag.content || '').trim() : '';
+            const dataValue = document.documentElement && document.documentElement.dataset
+                ? String(document.documentElement.dataset.buildTimeUtc || '').trim()
+                : '';
+            const fallbackValue = String(document.lastModified || '').trim();
+            const candidate = globalValue || metaValue || dataValue || fallbackValue;
+            const parsed = parseBuildTimestamp(candidate);
+            return parsed ? parsed.toISOString() : new Date().toISOString();
+        }
+
+        function formatBuildTimestampForDisplay(dateValue) {
+            const formatter = new Intl.DateTimeFormat(undefined, {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false,
+                timeZoneName: 'short'
+            });
+            const parts = formatter.formatToParts(dateValue);
+            const mapped = {};
+            for (const part of parts) {
+                mapped[part.type] = part.value;
+            }
+            return `${mapped.year}-${mapped.month}-${mapped.day} ${mapped.hour}:${mapped.minute}:${mapped.second} ${mapped.timeZoneName}`;
+        }
+
         function renderAppVersionLabel() {
             const el = document.getElementById('appVersionLabel');
             if (!el) return;
-            el.textContent = `Last Updated: ${APP_BUILD_VERSION}`;
+            el.textContent = `Last Updated: ${formatBuildTimestampForDisplay(APP_BUILD_DATE)}`;
         }
 
         function getPublishedBuildTimestamp() {
-            const digits = String(APP_BUILD_VERSION || '').replace(/\D/g, '');
-            if (digits.length >= 12) return digits.slice(0, 12);
-            if (digits.length >= 8) return `${digits.slice(0, 8)}0000`;
-            return 'BUILD';
+            const pad = value => String(value).padStart(2, '0');
+            return `${APP_BUILD_DATE.getUTCFullYear()}${pad(APP_BUILD_DATE.getUTCMonth() + 1)}${pad(APP_BUILD_DATE.getUTCDate())}${pad(APP_BUILD_DATE.getUTCHours())}${pad(APP_BUILD_DATE.getUTCMinutes())}`;
         }
 
         function getFileArrayBuffer(file) {

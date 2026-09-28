@@ -629,64 +629,103 @@
                 let actualLegalPages = 0;
                 let letterOutputPage = 0;
                 let legalOutputPage = 0;
+                let builtCount = 0;
+                let pageCursor = 0;
+                while (pageCursor < pageCount) {
+                    const runIsLegal = legalIndexSet.has(pageCursor);
+                    const runStart = pageCursor;
+                    while (pageCursor < pageCount && legalIndexSet.has(pageCursor) === runIsLegal) {
+                        pageCursor++;
+                    }
+                    const runEnd = pageCursor - 1;
+                    const runIndices = [];
+                    for (let j = runStart; j <= runEnd; j++) runIndices.push(j);
 
-                for (let i = 0; i < pageCount; i++) {
-                    if (i % 5 === 0) setStatus(`Phase 3: Building outputs (${i + 1}/${pageCount})...`);
-                    const pageNum = i + 1;
-                    const pageClass = pageClassifications[i] || { type: 'Unknown', ratio: 0, confidence: 0 };
-                    const isLegal = legalIndexSet.has(i);
-                    const sizeStr = isLegal ? 'Legal' : 'Letter';
-                    
-                    let newLegalNum = null;
-                    let newLetterNum = null;
-                    let placeholderOutputPage = null;
+                    if (runIsLegal) {
+                        const copiedLegalRun = await legalDoc.copyPages(srcDoc, runIndices);
+                        for (let runOffset = 0; runOffset < copiedLegalRun.length; runOffset++) {
+                            const pageIndex = runStart + runOffset;
+                            if (builtCount % 5 === 0) setStatus(`Phase 3: Building outputs (${builtCount + 1}/${pageCount})...`);
+                            const pageNum = pageIndex + 1;
+                            const pageClass = pageClassifications[pageIndex] || { type: 'Unknown', ratio: 0, confidence: 0 };
+                            const sizeStr = 'Legal';
+                            let newLegalNum = null;
+                            let newLetterNum = null;
+                            let placeholderOutputPage = null;
 
-                    if (isLegal) {
-                        actualLegalPages++;
-                        legalOutputPage++;
-                        newLegalNum = legalOutputPage;
+                            actualLegalPages++;
+                            legalOutputPage++;
+                            newLegalNum = legalOutputPage;
+                            legalDoc.addPage(copiedLegalRun[runOffset]);
 
-                        const [copiedLegalPage] = await legalDoc.copyPages(srcDoc, [i]);
-                        legalDoc.addPage(copiedLegalPage);
-                        
-                        if (placeholderMode === "Exact Page Preservation") {
-                            letterDoc.addPage([612, 792]);
-                            letterOutputPage++;
-                            placeholderOutputPage = letterOutputPage;
-                            placeholderOutputPagesCreated.add(placeholderOutputPage);
-                            placeholderCount++;
-                        } else if (placeholderMode === "One Placeholder Per Legal Section") {
-                            if (prevSize !== "Legal") {
+                            if (placeholderMode === "Exact Page Preservation") {
                                 letterDoc.addPage([612, 792]);
                                 letterOutputPage++;
                                 placeholderOutputPage = letterOutputPage;
                                 placeholderOutputPagesCreated.add(placeholderOutputPage);
                                 placeholderCount++;
+                            } else if (placeholderMode === "One Placeholder Per Legal Section") {
+                                if (prevSize !== "Legal") {
+                                    letterDoc.addPage([612, 792]);
+                                    letterOutputPage++;
+                                    placeholderOutputPage = letterOutputPage;
+                                    placeholderOutputPagesCreated.add(placeholderOutputPage);
+                                    placeholderCount++;
+                                }
                             }
+
+                            pagesData.push({
+                                original_page: pageNum,
+                                size: sizeStr,
+                                preview_text: extractedHeaders[pageIndex] || '[No identifying header found]',
+                                new_legal_page: newLegalNum,
+                                letter_output_page: newLetterNum,
+                                legal_output_page: newLegalNum,
+                                placeholder_output_page: placeholderOutputPage,
+                                aspect_ratio: pageClass.ratio,
+                                confidence: pageClass.confidence,
+                                width: pageClass.width,
+                                height: pageClass.height
+                            });
+
+                            prevSize = sizeStr;
+                            builtCount++;
                         }
                     } else {
-                        actualLetterPages++;
-                        letterOutputPage++;
-                        newLetterNum = letterOutputPage;
-                        const [copiedLetterPage] = await letterDoc.copyPages(srcDoc, [i]);
-                        letterDoc.addPage(copiedLetterPage);
+                        const copiedLetterRun = await letterDoc.copyPages(srcDoc, runIndices);
+                        for (let runOffset = 0; runOffset < copiedLetterRun.length; runOffset++) {
+                            const pageIndex = runStart + runOffset;
+                            if (builtCount % 5 === 0) setStatus(`Phase 3: Building outputs (${builtCount + 1}/${pageCount})...`);
+                            const pageNum = pageIndex + 1;
+                            const pageClass = pageClassifications[pageIndex] || { type: 'Unknown', ratio: 0, confidence: 0 };
+                            const sizeStr = 'Letter';
+                            let newLegalNum = null;
+                            let newLetterNum = null;
+                            let placeholderOutputPage = null;
+
+                            actualLetterPages++;
+                            letterOutputPage++;
+                            newLetterNum = letterOutputPage;
+                            letterDoc.addPage(copiedLetterRun[runOffset]);
+
+                            pagesData.push({
+                                original_page: pageNum,
+                                size: sizeStr,
+                                preview_text: extractedHeaders[pageIndex] || '[No identifying header found]',
+                                new_legal_page: newLegalNum,
+                                letter_output_page: newLetterNum,
+                                legal_output_page: newLegalNum,
+                                placeholder_output_page: placeholderOutputPage,
+                                aspect_ratio: pageClass.ratio,
+                                confidence: pageClass.confidence,
+                                width: pageClass.width,
+                                height: pageClass.height
+                            });
+
+                            prevSize = sizeStr;
+                            builtCount++;
+                        }
                     }
-                    
-                    pagesData.push({
-                        original_page: pageNum,
-                        size: sizeStr,
-                        preview_text: extractedHeaders[i] || '[No identifying header found]',
-                        new_legal_page: newLegalNum,
-                        letter_output_page: newLetterNum,
-                        legal_output_page: newLegalNum,
-                        placeholder_output_page: placeholderOutputPage,
-                        aspect_ratio: pageClass.ratio,
-                        confidence: pageClass.confidence,
-                        width: pageClass.width,
-                        height: pageClass.height
-                    });
-                    
-                    prevSize = sizeStr;
                 }
 
                 pagesData.sort((a, b) => a.original_page - b.original_page);

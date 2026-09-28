@@ -362,6 +362,10 @@
         });
 
         async function startProcessing(file) {
+            // Remove existing download button if doing a second file
+            const existingDl = document.getElementById('mobileDlBtn');
+            if(existingDl) existingDl.remove();
+
             let pdfJsDoc = null;
             try {
                 setStatus(`Reading ${file.name}...`);
@@ -372,11 +376,11 @@
                 // ==========================================
                 setStatus("Phase 1: Analyzing page headers...");
                 
-                // Load PDF for text extraction
+                // Load PDF for text extraction - sliced buffer prevents detachment crashes
                 pdfJsDoc = await pdfjsLib.getDocument({data: new Uint8Array(arrayBuffer).slice(0)}).promise;
                 const pageCount = pdfJsDoc.numPages;
                 
-                // Extract all headers sequentially first
+                // Extract all headers sequentially
                 let extractedHeaders = [];
                 for (let i = 1; i <= pageCount; i++) {
                     if (i % 5 === 0) setStatus(`Reading headers: Page ${i} of ${pageCount}...`);
@@ -384,8 +388,7 @@
                     extractedHeaders.push(headerText);
                 }
                 
-                // CRITICAL MOBILE MEMORY FIX: 
-                // Destroy the PDF.js worker completely to free up RAM before PDF-lib starts.
+                // CRITICAL MOBILE MEMORY FIX: Destroy PDF.js to free RAM before PDF-lib starts
                 await pdfJsDoc.destroy();
                 pdfJsDoc = null;
                 
@@ -409,12 +412,20 @@
                 let placeholderCount = 0;
                 let prevSize = null;
 
-                // Fast loop to rapidly determine page sizes without manipulating them yet
+                // --- CRITICAL FIX: ASPECT RATIO DETECTION ---
                 for (let i = 0; i < pageCount; i++) {
                     const srcPage = srcDoc.getPage(i);
                     const { width, height } = srcPage.getSize();
-                    // Detect Legal (>900 pts). 8.5x14 at 72dpi = 612x1008
-                    const isLegal = width > 900 || height > 900;
+                    
+                    // PDFs can be scanned at huge DPIs (e.g. 2500x3300). Checking raw points (>900) fails.
+                    // Instead, we check the Aspect Ratio (Long Edge / Short Edge).
+                    // Letter (11/8.5) = 1.29. Legal (14/8.5) = 1.64.
+                    const longEdge = Math.max(width, height);
+                    const shortEdge = Math.min(width, height);
+                    const aspectRatio = longEdge / shortEdge;
+                    
+                    // Threshold of 1.45 cleanly separates Letter from Legal regardless of scale/DPI
+                    const isLegal = aspectRatio > 1.45;
                     
                     if (isLegal) legalIndices.push(i);
                     else letterIndices.push(i);
@@ -441,7 +452,6 @@
                 let letterDocIndex = 0;
                 let legalDocIndex = 0;
                 
-                // Stitch the actual documents together and build the report data
                 for (let i = 0; i < pageCount; i++) {
                     const pageNum = i + 1;
                     const isLegal = legalIndices.includes(i);
@@ -454,7 +464,6 @@
                         legalDoc.addPage(copiedLegalPages[legalDocIndex]);
                         legalDocIndex++;
                         
-                        // Handle Placeholders efficiently
                         if (placeholderMode === "Exact Page Preservation") {
                             letterDoc.addPage([612, 792]);
                             placeholderCount++;
@@ -473,7 +482,7 @@
                     pagesData.push({
                         original_page: pageNum,
                         size: sizeStr,
-                        preview_text: extractedHeaders[i], // Pull from Phase 1 Memory
+                        preview_text: extractedHeaders[i],
                         new_legal_page: newLegalNum
                     });
                     
@@ -503,18 +512,36 @@
                 zip.file("3_Reassembly_Guide.pdf", reportBlob);
                 
                 const zipBlob = await zip.generateAsync({type: "blob"});
-                
                 const timestamp = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14);
                 const baseName = file.name.replace(/\.[^/.]+$/, "");
-                saveAs(zipBlob, `${baseName}_Processed_${timestamp}.zip`);
+                const fileName = `${baseName}_Processed_${timestamp}.zip`;
                 
-                setStatus("Success! Files downloaded.", false, true);
+                // --- CRITICAL FIX: IOS SAFARI DOWNLOAD TIMEOUT ---
+                // Safari blocks auto-downloads if the script takes too long. 
+                // We create a massive, visible download button to provide a fresh user click.
+                const blobUrl = URL.createObjectURL(zipBlob);
+                const actionContainer = document.getElementById('processBtn').parentElement;
+                
+                const dlButtonHtml = `
+                    <a href="${blobUrl}" download="${fileName}" id="mobileDlBtn" class="mt-6 block w-full px-6 py-4 bg-brandGreen hover:bg-green-700 text-white font-extrabold rounded shadow-lg border-2 border-green-600 animate-pulse text-center text-lg transition-colors">
+                        ⬇️ TAP HERE TO DOWNLOAD ZIP ⬇️
+                    </a>
+                `;
+                
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = dlButtonHtml;
+                actionContainer.appendChild(tempDiv.firstElementChild);
+
+                // Still attempt the auto-download for PC users
+                try { saveAs(zipBlob, fileName); } catch(e) { console.warn("Auto-download suppressed."); }
+                
+                setStatus("Success! Tap the green button above to save.", false, true);
 
             } catch (err) {
                 console.error(err);
-                if (pdfJsDoc) await pdfJsDoc.destroy().catch(e => console.log(e)); // Force memory cleanup
+                if (pdfJsDoc) await pdfJsDoc.destroy().catch(e => console.log(e)); 
                 setStatus("An error occurred during processing.", true);
-                alert("Error: " + err.message + "\n\nIf you are on an older mobile device, try testing with a smaller file to avoid memory limits.");
+                alert("Error: " + err.message);
             }
         }
 
@@ -525,37 +552,50 @@
                 
                 if (!textContent.items || textContent.items.length === 0) return "[Image Only / Blank Page]";
                 
-                // Group letters by their vertical (Y) position to stitch words together safely
+                // --- CRITICAL FIX: MOBILE TEXT RECONSTRUCTION ---
+                // Groups letters by vertical position and font size to combat iOS coordinate flipping
                 let lines = {};
+                let maxFontSizeOverall = 0;
+
                 for (let item of textContent.items) {
                     if (!item.str.trim()) continue;
                     
-                    // Round Y to nearest 5 to account for slight vertical misalignments in PDF text
-                    const y = Math.round(item.transform[5] / 5) * 5;
-                    if (!lines[y]) lines[y] = { text: [], maxFontSize: 0 };
+                    const fontSize = Math.round(item.transform[0] || item.height || 0);
+                    // Round Y to nearest 10 to group wandering letters on the same visual line
+                    const y = Math.round(item.transform[5] / 10) * 10; 
                     
-                    lines[y].text.push({ str: item.str, x: item.transform[4] });
-                    if (item.transform[0] > lines[y].maxFontSize) lines[y].maxFontSize = item.transform[0];
+                    const key = `${y}_${fontSize}`;
+                    if (!lines[key]) lines[key] = { text: [], fontSize: fontSize };
+                    
+                    lines[key].text.push({ str: item.str, x: item.transform[4] });
                 }
 
                 let bestText = "";
                 let maxScore = -1;
 
-                // Find the line with the absolute largest font size (This is universally the document title)
-                for (let y in lines) {
-                    let line = lines[y];
+                // Find the line with the absolute largest font
+                for (let key in lines) {
+                    let line = lines[key];
                     
-                    // Sort characters left-to-right mathematically
+                    // Sort characters left-to-right to fix scrambled words
                     line.text.sort((a, b) => a.x - b.x);
                     
-                    // Stitch back into a clean sentence
-                    let textStr = line.text.map(t => t.str).join(" ").replace(/\s+/g, ' ').trim();
-                    if (textStr.length < 4) continue;
+                    // Smart stitch: Add spaces only if distance between letters is large
+                    let stitched = "";
+                    for(let i=0; i<line.text.length; i++) {
+                        stitched += line.text[i].str;
+                        if(i < line.text.length - 1) {
+                            let dist = line.text[i+1].x - (line.text[i].x + (line.fontSize * 0.5));
+                            if(dist > line.fontSize * 0.2) stitched += " ";
+                        }
+                    }
+                    stitched = stitched.replace(/\s+/g, ' ').trim();
 
-                    let score = line.maxFontSize; 
-                    if (score > maxScore) {
-                        maxScore = score;
-                        bestText = textStr;
+                    if (stitched.length < 3) continue;
+
+                    if (line.fontSize > maxScore) {
+                        maxScore = line.fontSize;
+                        bestText = stitched;
                     }
                 }
 

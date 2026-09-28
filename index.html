@@ -786,9 +786,13 @@
             }
 
             function writeLine(text, step = 14) {
-                ensureSpace(step);
-                doc.text(text, marginX, cursorY);
-                cursorY += step;
+                const wrapped = doc.splitTextToSize(text, doc.internal.pageSize.width - (marginX * 2));
+                const lineHeight = 12;
+                const extraSpacing = Math.max(0, step - lineHeight);
+                const required = (wrapped.length * lineHeight) + extraSpacing;
+                ensureSpace(required);
+                doc.text(wrapped, marginX, cursorY);
+                cursorY += required;
             }
 
             function writeWrappedText(text, width, lineHeight = 12, extraSpacing = 0) {

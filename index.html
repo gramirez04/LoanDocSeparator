@@ -372,6 +372,16 @@
                 return { type: 'Unknown', confidence: 0, ratio: 0, width, height, reason: 'Invalid page dimensions' };
             }
 
+            function isMobileBrowser() {
+                const ua = navigator.userAgent || '';
+                const touchMac = /Macintosh/i.test(ua) && navigator.maxTouchPoints > 1;
+                return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua) || touchMac;
+            }
+
+            function yieldToUI() {
+                return new Promise(resolve => setTimeout(resolve, 0));
+            }
+
             const longEdge = Math.max(width, height);
             const shortEdge = Math.min(width, height);
             const ratio = longEdge / shortEdge;
@@ -555,6 +565,7 @@
             let pageClassifications = [];
             let pagesData = [];
             try {
+                const mobileMode = isMobileBrowser();
                 setStatus(`Reading ${file.name}...`);
                 arrayBuffer = await file.arrayBuffer();
                 
@@ -569,6 +580,7 @@
                     if (i % 5 === 0) setStatus(`Reading headers: Page ${i} of ${pageCount}...`);
                     const headerText = await extractHeaderPreview(pdfJsDoc, i);
                     extractedHeaders.push(headerText);
+                    if (mobileMode && i % 3 === 0) await yieldToUI();
                 }
                 
                 await pdfJsDoc.destroy();
@@ -580,7 +592,7 @@
                 setStatus("Phase 2: Separating Legal and Letter pages...");
                 const { PDFDocument } = PDFLib;
                 const srcBytes = new Uint8Array(arrayBuffer);
-                const srcDocClassify = await PDFDocument.load(srcBytes.slice(0));
+                const srcDoc = await PDFDocument.load(srcBytes.slice(0));
                 
                 const letterDoc = await PDFDocument.create();
                 const legalDoc = await PDFDocument.create();
@@ -598,7 +610,7 @@
                 const placeholderOutputPagesCreated = new Set();
 
                 for (let i = 0; i < pageCount; i++) {
-                    const srcPage = srcDocClassify.getPage(i);
+                    const srcPage = srcDoc.getPage(i);
                     const { width, height } = srcPage.getSize();
                     const pageClass = classifyPageDimensions(width, height);
                     pageClassifications.push(pageClass);
@@ -617,6 +629,7 @@
                             reason: pageClass.reason || 'Unknown page size'
                         });
                     }
+                    if (mobileMode && i % 5 === 0) await yieldToUI();
                 }
 
                 if (unknownPages.length > 0) {
@@ -643,8 +656,8 @@
                     for (let j = runStart; j <= runEnd; j++) runIndices.push(j);
 
                     if (runIsLegal) {
-                        const embeddedLegalRun = await legalDoc.embedPdf(srcBytes, runIndices);
-                        for (let runOffset = 0; runOffset < embeddedLegalRun.length; runOffset++) {
+                        const copiedLegalRun = await legalDoc.copyPages(srcDoc, runIndices);
+                        for (let runOffset = 0; runOffset < copiedLegalRun.length; runOffset++) {
                             const pageIndex = runStart + runOffset;
                             if (builtCount % 5 === 0) setStatus(`Phase 3: Building outputs (${builtCount + 1}/${pageCount})...`);
                             const pageNum = pageIndex + 1;
@@ -657,9 +670,7 @@
                             actualLegalPages++;
                             legalOutputPage++;
                             newLegalNum = legalOutputPage;
-                            const embeddedLegalPage = embeddedLegalRun[runOffset];
-                            const legalOutPage = legalDoc.addPage([embeddedLegalPage.width, embeddedLegalPage.height]);
-                            legalOutPage.drawPage(embeddedLegalPage);
+                            legalDoc.addPage(copiedLegalRun[runOffset]);
 
                             if (placeholderMode === "Exact Page Preservation") {
                                 letterDoc.addPage([612, 792]);
@@ -693,10 +704,11 @@
 
                             prevSize = sizeStr;
                             builtCount++;
+                            if (mobileMode && builtCount % 4 === 0) await yieldToUI();
                         }
                     } else {
-                        const embeddedLetterRun = await letterDoc.embedPdf(srcBytes, runIndices);
-                        for (let runOffset = 0; runOffset < embeddedLetterRun.length; runOffset++) {
+                        const copiedLetterRun = await letterDoc.copyPages(srcDoc, runIndices);
+                        for (let runOffset = 0; runOffset < copiedLetterRun.length; runOffset++) {
                             const pageIndex = runStart + runOffset;
                             if (builtCount % 5 === 0) setStatus(`Phase 3: Building outputs (${builtCount + 1}/${pageCount})...`);
                             const pageNum = pageIndex + 1;
@@ -709,9 +721,7 @@
                             actualLetterPages++;
                             letterOutputPage++;
                             newLetterNum = letterOutputPage;
-                            const embeddedLetterPage = embeddedLetterRun[runOffset];
-                            const letterOutPage = letterDoc.addPage([embeddedLetterPage.width, embeddedLetterPage.height]);
-                            letterOutPage.drawPage(embeddedLetterPage);
+                            letterDoc.addPage(copiedLetterRun[runOffset]);
 
                             pagesData.push({
                                 original_page: pageNum,
@@ -729,8 +739,10 @@
 
                             prevSize = sizeStr;
                             builtCount++;
+                            if (mobileMode && builtCount % 4 === 0) await yieldToUI();
                         }
                     }
+                    if (mobileMode) await yieldToUI();
                 }
 
                 pagesData.sort((a, b) => a.original_page - b.original_page);
@@ -772,7 +784,7 @@
                 
                 zip.file("3_Reassembly_Guide.pdf", reportBlob);
                 
-                const zipBlob = await zip.generateAsync({ type: 'blob' });
+                const zipBlob = await zip.generateAsync(mobileMode ? { type: 'blob', compression: 'STORE' } : { type: 'blob' });
                 const timestamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
                 const baseName = file.name.replace(/\.[^/.]+$/, '');
                 const fileName = `${baseName}_Processed_${timestamp}.zip`;
@@ -801,8 +813,12 @@
                 }
                 actionContainer.appendChild(mobileLink);
 
-                try { saveAs(zipBlob, fileName); } catch (e) { console.warn('Auto-download suppressed.', e); }
-                setStatus('Success! Tap the green button above to save.', false, true);
+                if (!mobileMode) {
+                    try { saveAs(zipBlob, fileName); } catch (e) { console.warn('Auto-download suppressed.', e); }
+                    setStatus('Success! Download started. If blocked, use the green button.', false, true);
+                } else {
+                    setStatus('Success! Tap the green button above to save.', false, true);
+                }
 
             } catch (err) {
                 console.error(err);

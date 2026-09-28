@@ -647,9 +647,6 @@
                 const tempDiv = document.createElement('div');
                 tempDiv.innerHTML = dlButtonHtml;
                 const mobileLink = tempDiv.firstElementChild;
-                mobileLink.addEventListener('click', () => {
-                    setTimeout(() => clearPreviousMobileDownload(), 30000);
-                }, { once: true });
                 actionContainer.appendChild(mobileLink);
 
                 try { saveAs(zipBlob, fileName); } catch (e) { console.warn('Auto-download suppressed.', e); }

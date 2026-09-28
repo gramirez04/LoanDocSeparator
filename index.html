@@ -352,6 +352,22 @@
             el.textContent = `Last Updated: ${APP_BUILD_VERSION}`;
         }
 
+        function getPublishedBuildTimestamp() {
+            const digits = String(APP_BUILD_VERSION || '').replace(/\D/g, '');
+            if (digits.length >= 12) return digits.slice(0, 12);
+            if (digits.length >= 8) return `${digits.slice(0, 8)}0000`;
+            return 'BUILD';
+        }
+
+        function getFileArrayBuffer(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = () => reject(reader.error || new Error('Unable to read selected file.'));
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
         function triggerFileSelect() {
             // Check license right before attempting to process
             const licenseBarText = document.getElementById('licenseBar').textContent;
@@ -446,6 +462,17 @@
 
         function yieldToUI() {
             return new Promise(resolve => setTimeout(resolve, 0));
+        }
+
+        async function copyPagesInChunks(targetDoc, srcDoc, indices, mobileMode) {
+            const copiedPages = [];
+            const chunkSize = mobileMode ? 4 : 24;
+            for (let i = 0; i < indices.length; i += chunkSize) {
+                const chunk = indices.slice(i, i + chunkSize);
+                copiedPages.push(...await targetDoc.copyPages(srcDoc, chunk));
+                if (mobileMode) await yieldToUI();
+            }
+            return copiedPages;
         }
 
         function validateClassifiedPageAccounting(pageCount, pagesData, classifiedLetterCount, classifiedLegalCount, actualLetterPages, actualLegalPages, placeholderMode, placeholderCount, expectedFinalLetterPagesBuilt, finalLetterCount, finalLegalCount, placeholderOutputPagesCreated) {
@@ -591,7 +618,7 @@
             try {
                 const mobileMode = isMobileBrowser();
                 setStatus(`Reading ${file.name}...`);
-                arrayBuffer = await file.arrayBuffer();
+                arrayBuffer = await getFileArrayBuffer(file);
                 
                 // ==========================================
                 // PHASE 1: TEXT EXTRACTION (PDF.js)
@@ -616,8 +643,8 @@
                 // ==========================================
                 setStatus("Phase 2: Separating Legal and Letter pages...");
                 const { PDFDocument } = PDFLib;
-                const srcBytes = new Uint8Array(arrayBuffer);
-                const srcDoc = await PDFDocument.load(srcBytes.slice(0));
+                const srcBytes = new Uint8Array(arrayBuffer.slice(0));
+                const srcDoc = await PDFDocument.load(srcBytes);
                 
                 const letterDoc = await PDFDocument.create();
                 const legalDoc = await PDFDocument.create();
@@ -686,7 +713,7 @@
                     for (let j = runStart; j <= runEnd; j++) runIndices.push(j);
 
                     if (runIsLegal) {
-                        const copiedLegalRun = await legalDoc.copyPages(srcDoc, runIndices);
+                        const copiedLegalRun = await copyPagesInChunks(legalDoc, srcDoc, runIndices, mobileMode);
                         for (let runOffset = 0; runOffset < copiedLegalRun.length; runOffset++) {
                             const pageIndex = runStart + runOffset;
                             if (builtCount % 5 === 0) setStatus(`Phase 3: Building outputs (${builtCount + 1}/${pageCount})...`);
@@ -737,7 +764,7 @@
                             if (mobileMode && builtCount % 4 === 0) await yieldToUI();
                         }
                     } else {
-                        const copiedLetterRun = await letterDoc.copyPages(srcDoc, runIndices);
+                        const copiedLetterRun = await copyPagesInChunks(letterDoc, srcDoc, runIndices, mobileMode);
                         for (let runOffset = 0; runOffset < copiedLetterRun.length; runOffset++) {
                             const pageIndex = runStart + runOffset;
                             if (builtCount % 5 === 0) setStatus(`Phase 3: Building outputs (${builtCount + 1}/${pageCount})...`);
@@ -815,7 +842,7 @@
                 zip.file("3_Reassembly_Guide.pdf", reportBlob);
                 
                 const zipBlob = await zip.generateAsync(mobileMode ? { type: 'blob', compression: 'STORE' } : { type: 'blob' });
-                const timestamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
+                const timestamp = getPublishedBuildTimestamp();
                 const baseName = file.name.replace(/\.[^/.]+$/, '');
                 const fileName = `${baseName}_Processed_${timestamp}.zip`;
                 

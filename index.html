@@ -554,8 +554,6 @@
             let extractedHeaders = [];
             let pageClassifications = [];
             let pagesData = [];
-            let copiedLetterPages = [];
-            let copiedLegalPages = [];
             try {
                 setStatus(`Reading ${file.name}...`);
                 arrayBuffer = await file.arrayBuffer();
@@ -627,23 +625,13 @@
                     throw new Error(`Unable to classify page size for source page(s): ${pagesList}. Processing stopped for review.`);
                 }
 
-                // Copy pages in batches to reduce UI blocking while keeping memory usage controlled.
-                if (letterIndices.length > 0) {
-                    copiedLetterPages = await letterDoc.copyPages(srcDoc, letterIndices);
-                }
-                
-                if (legalIndices.length > 0) {
-                    copiedLegalPages = await legalDoc.copyPages(srcDoc, legalIndices);
-                }
-
                 let actualLetterPages = 0;
                 let actualLegalPages = 0;
-                let letterDocIndex = 0;
-                let legalDocIndex = 0;
                 let letterOutputPage = 0;
                 let legalOutputPage = 0;
 
                 for (let i = 0; i < pageCount; i++) {
+                    if (i % 5 === 0) setStatus(`Phase 3: Building outputs (${i + 1}/${pageCount})...`);
                     const pageNum = i + 1;
                     const pageClass = pageClassifications[i] || { type: 'Unknown', ratio: 0, confidence: 0 };
                     const isLegal = legalIndexSet.has(i);
@@ -658,8 +646,8 @@
                         legalOutputPage++;
                         newLegalNum = legalOutputPage;
 
-                        legalDoc.addPage(copiedLegalPages[legalDocIndex]);
-                        legalDocIndex++;
+                        const [copiedLegalPage] = await legalDoc.copyPages(srcDoc, [i]);
+                        legalDoc.addPage(copiedLegalPage);
                         
                         if (placeholderMode === "Exact Page Preservation") {
                             letterDoc.addPage([612, 792]);
@@ -680,8 +668,8 @@
                         actualLetterPages++;
                         letterOutputPage++;
                         newLetterNum = letterOutputPage;
-                        letterDoc.addPage(copiedLetterPages[letterDocIndex]);
-                        letterDocIndex++;
+                        const [copiedLetterPage] = await letterDoc.copyPages(srcDoc, [i]);
+                        letterDoc.addPage(copiedLetterPage);
                     }
                     
                     pagesData.push({

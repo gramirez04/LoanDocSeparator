@@ -94,6 +94,9 @@
                 <div class="h-px bg-brandGreen w-12"></div>
             </div>
 
+            <!-- Version Timestamp -->
+            <div id="versionTimestamp" class="text-center mt-2 text-[9px] sm:text-[10px] text-slate-400 font-medium tracking-wide"></div>
+
             <!-- Tagline -->
             <div class="flex justify-center items-center space-x-2 mt-3 text-[10px] sm:text-xs font-bold tracking-widest uppercase">
                 <span class="text-brandGreen">Organize.</span>
@@ -152,7 +155,7 @@
 
             <!-- Action Button -->
             <div class="mt-8 text-center">
-                <input type="file" id="pdfInput" accept="application/pdf" class="hidden">
+                <input type="file" id="pdfInput" accept="application/pdf" style="position:absolute;width:0;height:0;opacity:0;overflow:hidden;" aria-hidden="true">
                 <button id="processBtn" class="w-full sm:w-auto px-8 py-3 bg-brandBlue hover:bg-brandGreen text-white font-bold rounded shadow-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed" onclick="triggerFileSelect()">
                     Select & Process PDF
                 </button>
@@ -215,6 +218,7 @@
         const ADMIN_MASTER_KEY = "SL-ADMIN-GERMAN-2026";
         const BETA_PASSWORD = "SLTRIAL";
         const BETA_EXPIRATION_DATE = new Date("2026-10-03T23:59:59"); // Expires Oct 3, 2026
+        const LAST_UPDATED = "September 28, 2026";
         let hwid = generateMockHWID();
         let isSessionUnlocked = false; // Requires password every time the app opens
         let currentDownloadUrl = null;
@@ -337,6 +341,18 @@
             }
         }
 
+        function getFileArrayBuffer(file) {
+            if (file.arrayBuffer) return file.arrayBuffer();
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = () => reject(reader.error);
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
+        function yieldToUI() { return new Promise(r => setTimeout(r, 0)); }
+
         function setStatus(msg, isError = false, isSuccess = false) {
             const el = document.getElementById('statusLabel');
             el.textContent = msg;
@@ -413,7 +429,7 @@
             let pdfJsDoc = null;
             try {
                 setStatus(`Reading ${file.name}...`);
-                const arrayBuffer = await file.arrayBuffer();
+                const arrayBuffer = await getFileArrayBuffer(file);
                 
                 // ==========================================
                 // PHASE 1: TEXT EXTRACTION (PDF.js)
@@ -454,6 +470,7 @@
                 let pageClassifications = [];
 
                 for (let i = 0; i < pageCount; i++) {
+                    if (i % 10 === 0) await yieldToUI();
                     const srcPage = srcDoc.getPage(i);
                     const { width, height } = srcPage.getSize();
                     const pageClass = classifyPageDimensions(width, height);
@@ -483,6 +500,7 @@
                 let legalOutputPage = 0;
 
                 for (let i = 0; i < pageCount; i++) {
+                    if (i % 10 === 0) { setStatus(`Assembling: Page ${i+1} of ${pageCount}...`); await yieldToUI(); }
                     const pageNum = i + 1;
                     const pageClass = pageClassifications[i];
                     const sizeStr = pageClass.type === 'Legal' ? 'Legal' : 'Letter';
@@ -568,7 +586,7 @@
                 const actionContainer = document.getElementById('processBtn').parentElement;
                 
                 const dlButtonHtml = `
-                    <a href="${blobUrl}" download="${fileName}" id="mobileDlBtn" class="mt-6 block w-full px-6 py-4 bg-brandGreen hover:bg-green-700 text-white font-extrabold rounded shadow-lg border border-green-600 text-center">
+                    <a href="${blobUrl}" download="${fileName}" target="_blank" id="mobileDlBtn" class="mt-6 block w-full px-6 py-4 bg-brandGreen hover:bg-green-700 text-white font-extrabold rounded shadow-lg border border-green-600 text-center">
                         ⬇️ TAP HERE TO DOWNLOAD ZIP ⬇️
                     </a>
                 `;
@@ -578,6 +596,18 @@
                 actionContainer.appendChild(tempDiv.firstElementChild);
 
                 try { saveAs(zipBlob, fileName); } catch (e) { console.warn('Auto-download suppressed.', e); }
+                // Mobile fallback: use Web Share API if available (iOS Safari blocks blob downloads)
+                try {
+                    const shareFile = new File([zipBlob], fileName, { type: 'application/zip' });
+                    if (navigator.share && navigator.canShare && navigator.canShare({ files: [shareFile] })) {
+                        const dlBtn = document.getElementById('mobileDlBtn');
+                        if (dlBtn) dlBtn.addEventListener('click', async (e) => {
+                            e.preventDefault();
+                            try { await navigator.share({ files: [shareFile], title: fileName }); }
+                            catch (shareErr) { console.warn('Share cancelled', shareErr); }
+                        });
+                    }
+                } catch (shareCheckErr) { console.warn('Web Share API not available', shareCheckErr); }
                 setStatus('Success! Tap the green button above to save.', false, true);
 
             } catch (err) {
@@ -855,6 +885,7 @@
             updateUIState();
             checkLicensingState();
             initConnectionGuard();
+            document.getElementById('versionTimestamp').textContent = 'Last Updated: ' + LAST_UPDATED;
         });
 
         // --- Connection Guard Logic ---

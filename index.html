@@ -421,6 +421,23 @@
             return { type: 'Letter', confidence: Math.max(0.45, 1 - (letterDiff / ratioTolerance)), ratio, width, height };
         }
 
+        function resolvePageClassification(pdfLibClass, pdfJsClass) {
+            const libClass = pdfLibClass || { type: 'Unknown', confidence: 0 };
+            const jsClass = pdfJsClass || { type: 'Unknown', confidence: 0 };
+
+            if (libClass.type === 'Unknown' && jsClass.type !== 'Unknown') return jsClass;
+            if (jsClass.type === 'Unknown' && libClass.type !== 'Unknown') return libClass;
+
+            if (libClass.type !== jsClass.type) {
+                if (libClass.type === 'Legal' || jsClass.type === 'Legal') {
+                    return (libClass.type === 'Legal') ? libClass : jsClass;
+                }
+                return (jsClass.confidence > libClass.confidence) ? jsClass : libClass;
+            }
+
+            return (jsClass.confidence > libClass.confidence) ? jsClass : libClass;
+        }
+
         function isMobileBrowser() {
             const ua = navigator.userAgent || '';
             const touchMac = /Macintosh/i.test(ua) && navigator.maxTouchPoints > 1;
@@ -568,6 +585,7 @@
             let pdfJsDoc = null;
             let arrayBuffer = null;
             let extractedHeaders = [];
+            let pdfJsPageDimensions = [];
             let pageClassifications = [];
             let pagesData = [];
             try {
@@ -584,8 +602,9 @@
                 
                 for (let i = 1; i <= pageCount; i++) {
                     if (i % 5 === 0) setStatus(`Reading headers: Page ${i} of ${pageCount}...`);
-                    const headerText = await extractHeaderPreview(pdfJsDoc, i);
-                    extractedHeaders.push(headerText);
+                    const pagePreview = await extractHeaderPreview(pdfJsDoc, i);
+                    extractedHeaders.push(pagePreview.headerText);
+                    pdfJsPageDimensions.push({ width: pagePreview.width, height: pagePreview.height });
                     if (mobileMode && i % 3 === 0) await yieldToUI();
                 }
                 
@@ -618,7 +637,12 @@
                 for (let i = 0; i < pageCount; i++) {
                     const srcPage = srcDoc.getPage(i);
                     const { width, height } = srcPage.getSize();
-                    const pageClass = classifyPageDimensions(width, height);
+                    const libPageClass = classifyPageDimensions(width, height);
+                    const jsDims = pdfJsPageDimensions[i];
+                    const jsPageClass = (jsDims && Number.isFinite(jsDims.width) && Number.isFinite(jsDims.height))
+                        ? classifyPageDimensions(jsDims.width, jsDims.height)
+                        : { type: 'Unknown', confidence: 0, ratio: 0, width: jsDims?.width, height: jsDims?.height, reason: 'Missing PDF.js dimensions' };
+                    const pageClass = resolvePageClassification(libPageClass, jsPageClass);
                     pageClassifications.push(pageClass);
 
                     const isLegal = pageClass.type === 'Legal';
@@ -837,9 +861,14 @@
         async function extractHeaderPreview(pdfJsDoc, pageNum) {
             try {
                 const page = await pdfJsDoc.getPage(pageNum);
+                const viewport = page.getViewport({ scale: 1 });
+                const pageWidth = Math.abs(Number(viewport.width) || 0);
+                const pageHeight = Math.abs(Number(viewport.height) || 0);
                 const textContent = await page.getTextContent();
                 
-                if (!textContent.items || textContent.items.length === 0) return '[Image Only / Blank Page]';
+                if (!textContent.items || textContent.items.length === 0) {
+                    return { headerText: '[Image Only / Blank Page]', width: pageWidth, height: pageHeight };
+                }
                 
                 let lines = {};
                 for (let item of textContent.items) {
@@ -882,10 +911,14 @@
                     }
                 }
 
-                return bestText ? bestText.substring(0, 85) : '[No identifying header found]';
+                return {
+                    headerText: bestText ? bestText.substring(0, 85) : '[No identifying header found]',
+                    width: pageWidth,
+                    height: pageHeight
+                };
             } catch (e) {
                 console.warn('Header Extraction Skipped:', e);
-                return '[Error reading text]';
+                return { headerText: '[Error reading text]', width: NaN, height: NaN };
             }
         }
 

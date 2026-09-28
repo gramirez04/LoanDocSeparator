@@ -59,17 +59,17 @@
         .modal.active { display: flex; align-items: center; justify-content: center; }
     </style>
 </head>
-<body class="min-h-screen flex flex-col items-center py-10 px-4 text-slate-800">
+<body class="min-h-screen flex flex-col items-center py-6 sm:py-10 px-3 sm:px-4 text-slate-800 overflow-x-hidden">
 
     <div class="w-full max-w-xl bg-white rounded-lg shadow-lg border border-slate-200 overflow-hidden relative">
         
         <!-- Top Utility Bar -->
-        <div class="bg-slate-50 border-b border-slate-200 px-4 py-3 flex justify-between items-center">
-            <button onclick="downloadApp()" class="text-xs font-bold text-brandBlue hover:text-brandGreen flex items-center transition-colors shadow-sm bg-white border border-slate-200 px-3 py-1.5 rounded">
+        <div class="bg-slate-50 border-b border-slate-200 px-4 py-3 flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center">
+            <button onclick="downloadApp()" class="min-h-[44px] text-xs font-bold text-brandBlue hover:text-brandGreen flex items-center justify-center transition-colors shadow-sm bg-white border border-slate-200 px-3 py-1.5 rounded">
                 <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
                 Save App to PC
             </button>
-            <div id="connectionIndicator" class="transition-all duration-300">
+            <div id="connectionIndicator" class="transition-all duration-300 w-full sm:w-auto flex justify-center">
                 <!-- Populated by JS -->
             </div>
         </div>
@@ -77,10 +77,10 @@
         <!-- Header -->
         <div class="text-center pt-6 pb-4">
             <!-- Main Title -->
-            <div class="flex justify-center items-baseline space-x-0 tracking-tight">
-                <h1 class="text-4xl font-extrabold text-brandGreen m-0 p-0">Loan</h1>
-                <h1 class="text-4xl font-extrabold text-brandBlue m-0 p-0">Doc</h1>
-                <h1 class="text-4xl font-extrabold text-brandGreen m-0 p-0">Separator</h1>
+            <div class="flex justify-center items-baseline space-x-0 tracking-tight flex-wrap">
+                <h1 class="text-3xl sm:text-4xl font-extrabold text-brandGreen m-0 p-0">Loan</h1>
+                <h1 class="text-3xl sm:text-4xl font-extrabold text-brandBlue m-0 p-0">Doc</h1>
+                <h1 class="text-3xl sm:text-4xl font-extrabold text-brandGreen m-0 p-0">Separator</h1>
             </div>
             
             <!-- Subtitle -->
@@ -95,7 +95,9 @@
             </div>
 
             <!-- Version Timestamp -->
-            <div id="versionTimestamp" class="text-center mt-2 text-[9px] sm:text-[10px] text-slate-400 font-medium tracking-wide"></div>
+            <div id="versionTimestamp" class="text-center mt-2 text-[10px] sm:text-[11px] text-slate-400 font-medium tracking-wide">
+                <span id="lastUpdated">Last updated: Loading...</span>
+            </div>
 
             <!-- Tagline -->
             <div class="flex justify-center items-center space-x-2 mt-3 text-[10px] sm:text-xs font-bold tracking-widest uppercase">
@@ -108,24 +110,24 @@
         </div>
 
         <!-- License Status Bar -->
-        <div id="licenseBar" class="w-full text-center py-2 px-4 text-sm font-bold cursor-pointer transition-colors" onclick="openActivationModal()">
+        <div id="licenseBar" class="w-full text-center min-h-[44px] py-2 px-4 text-sm font-bold cursor-pointer transition-colors flex items-center justify-center" onclick="openActivationModal()">
             Loading access status...
         </div>
 
         <div class="h-1 w-full bg-brandBlue"></div>
 
         <!-- Main Card Content -->
-        <div class="p-6 sm:p-8">
+        <div class="p-4 sm:p-8">
             <h2 class="text-lg font-bold text-slate-800 mb-2">PAGE POSITION PRESERVATION</h2>
             <p class="text-sm text-slate-600 mb-4">Preserve positions of removed Legal pages?</p>
 
             <!-- Preserve Options -->
             <div class="space-y-2 mb-4">
-                <label class="flex items-center space-x-3 cursor-pointer" for="preserveNo">
+                <label class="flex items-center space-x-3 cursor-pointer min-h-[44px]" for="preserveNo">
                     <input type="radio" id="preserveNo" name="preserve" value="No" class="form-radio h-4 w-4 text-brandBlue" checked onchange="updateUIState()">
                     <span class="text-sm text-slate-700">No (Default)</span>
                 </label>
-                <label class="flex items-center space-x-3 cursor-pointer" for="preserveYes">
+                <label class="flex items-center space-x-3 cursor-pointer min-h-[44px]" for="preserveYes">
                     <input type="radio" id="preserveYes" name="preserve" value="Yes" class="form-radio h-4 w-4 text-brandBlue" onchange="updateUIState()">
                     <span class="text-sm text-slate-700">Yes</span>
                 </label>
@@ -135,11 +137,11 @@
             <div id="method-container" class="ml-6 pl-4 border-l-2 border-slate-200 opacity-50 pointer-events-none transition-opacity">
                 <p class="text-xs font-bold text-slate-800 mb-2">Placeholder Insertion Method:</p>
                 <div class="space-y-2">
-                    <label class="flex items-center space-x-3 cursor-pointer" for="methodExact">
+                    <label class="flex items-center space-x-3 cursor-pointer min-h-[44px]" for="methodExact">
                         <input type="radio" id="methodExact" name="method" value="Exact Page Preservation" class="form-radio h-4 w-4 text-brandBlue" checked onchange="updateUIState()">
                         <span class="text-sm text-slate-700">Exact Page Preservation</span>
                     </label>
-                    <label class="flex items-center space-x-3 cursor-pointer" for="methodSection">
+                    <label class="flex items-center space-x-3 cursor-pointer min-h-[44px]" for="methodSection">
                         <input type="radio" id="methodSection" name="method" value="One Placeholder Per Legal Section" class="form-radio h-4 w-4 text-brandBlue" onchange="updateUIState()">
                         <span class="text-sm text-slate-700">One Placeholder Per Legal Section</span>
                     </label>
@@ -155,8 +157,8 @@
 
             <!-- Action Button -->
             <div class="mt-8 text-center">
-                <input type="file" id="pdfInput" accept="application/pdf" style="position:absolute;width:0;height:0;opacity:0;overflow:hidden;" aria-hidden="true">
-                <button id="processBtn" class="w-full sm:w-auto px-8 py-3 bg-brandBlue hover:bg-brandGreen text-white font-bold rounded shadow-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed" onclick="triggerFileSelect()">
+                <input type="file" id="pdfInput" accept="application/pdf,.pdf" style="position:absolute;width:0;height:0;opacity:0;overflow:hidden;" aria-hidden="true">
+                <button id="processBtn" class="w-full sm:w-auto min-h-[44px] px-8 py-3 bg-brandBlue hover:bg-brandGreen text-white font-bold rounded shadow-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed" onclick="triggerFileSelect()">
                     Select & Process PDF
                 </button>
                 <p class="mt-3 text-xs text-slate-500 font-medium">
@@ -181,7 +183,7 @@
     <!-- Activation Modal -->
     <div id="activationModal" class="modal">
         <div class="bg-white rounded-lg shadow-xl border border-slate-200 w-full max-w-md p-6 relative">
-            <button onclick="closeActivationModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
+            <button onclick="closeActivationModal()" class="absolute top-3 right-3 w-11 h-11 flex items-center justify-center text-slate-400 hover:text-slate-600">
                 <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
             
@@ -207,10 +209,10 @@
             <div class="space-y-4">
                 <div>
                     <label class="block text-xs font-bold text-slate-700 mb-1">Beta Password:</label>
-                    <input type="text" id="licenseKeyInput" class="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-brandBlue" placeholder="Enter password">
+                    <input type="text" id="licenseKeyInput" class="w-full min-h-[44px] px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-brandBlue" placeholder="Enter password">
                 </div>
                 <p id="hwidDisplay" class="text-xs text-slate-400 font-mono hidden"></p>
-                <button onclick="activateSoftware()" class="w-full py-2 bg-brandBlue hover:bg-brandGreen text-white font-bold rounded shadow transition-colors">
+                <button onclick="activateSoftware()" class="w-full min-h-[44px] py-2 bg-brandBlue hover:bg-brandGreen text-white font-bold rounded shadow transition-colors">
                     Unlock App
                 </button>
             </div>
@@ -225,12 +227,10 @@
         const ADMIN_MASTER_KEY = "SL-ADMIN-GERMAN-2026";
         const BETA_PASSWORD = "SLTRIAL";
         const BETA_EXPIRATION_DATE = new Date("2026-10-03T23:59:59"); // Expires Oct 3, 2026
-        // Last-published timestamp is fetched dynamically from the server's Last-Modified
-        // header so it auto-updates every time the code is published — no manual edit needed.
-        const LAST_UPDATED = "Sept 28, 2026, 11:40:00 AM";
         let hwid = generateMockHWID();
         let isSessionUnlocked = false; // Requires password every time the app opens
         let currentDownloadUrl = null;
+        let isProcessing = false;
         
         // Trial & Licensing Management
         function generateMockHWID() {
@@ -251,7 +251,7 @@
             // 1. Check Admin Key (Kept permanently so you don't have to enter it)
             if (key === ADMIN_MASTER_KEY) {
                 licenseBar.textContent = "✓ MASTER ADMIN LICENSE ACTIVE";
-                licenseBar.className = "w-full text-center py-2 px-4 text-sm font-bold cursor-pointer transition-colors bg-green-50 text-brandGreen";
+                licenseBar.className = "w-full text-center min-h-[44px] py-2 px-4 text-sm font-bold cursor-pointer transition-colors bg-green-50 text-brandGreen flex items-center justify-center";
                 processBtn.disabled = false;
                 return;
             }
@@ -259,18 +259,18 @@
             // 2. Check Session Beta Status (Memory only, requires password every open)
             if (isSessionUnlocked && now <= BETA_EXPIRATION_DATE) {
                 licenseBar.textContent = "✓ BETA TEST BUILD ACTIVE (Expires Oct 3, 2026)";
-                licenseBar.className = "w-full text-center py-2 px-4 text-sm font-bold cursor-pointer transition-colors bg-purple-50 text-purple-700";
+                licenseBar.className = "w-full text-center min-h-[44px] py-2 px-4 text-sm font-bold cursor-pointer transition-colors bg-purple-50 text-purple-700 flex items-center justify-center";
                 processBtn.disabled = false;
             } else if (isSessionUnlocked && now > BETA_EXPIRATION_DATE) {
                 licenseBar.textContent = "✗ Beta Test Period Expired.";
-                licenseBar.className = "w-full text-center py-2 px-4 text-sm font-bold cursor-pointer transition-colors bg-red-50 text-red-600";
+                licenseBar.className = "w-full text-center min-h-[44px] py-2 px-4 text-sm font-bold cursor-pointer transition-colors bg-red-50 text-red-600 flex items-center justify-center";
                 processBtn.disabled = true;
                 
                 // Show modal on load if expired
                 setTimeout(() => openActivationModal("The beta testing period for this build has ended."), 500);
             } else {
                 licenseBar.textContent = "🔒 App Locked. Beta Password Required.";
-                licenseBar.className = "w-full text-center py-2 px-4 text-sm font-bold cursor-pointer transition-colors bg-red-50 text-red-600";
+                licenseBar.className = "w-full text-center min-h-[44px] py-2 px-4 text-sm font-bold cursor-pointer transition-colors bg-red-50 text-red-600 flex items-center justify-center";
                 processBtn.disabled = true;
                 
                 // Show modal on load to prompt for password
@@ -366,7 +366,7 @@
         function setStatus(msg, isError = false, isSuccess = false) {
             const el = document.getElementById('statusLabel');
             el.textContent = msg;
-            el.className = "text-sm font-medium h-5 mt-2 " + 
+            el.className = "text-sm font-medium min-h-[1.5rem] mt-2 px-2 " + 
                 (isError ? "text-red-600" : isSuccess ? "text-brandGreen" : "text-brandBlue");
         }
 
@@ -391,6 +391,7 @@
         }
 
         function triggerFileSelect() {
+            if (isProcessing) return;
             // Check license right before attempting to process
             const licenseBarText = document.getElementById('licenseBar').textContent;
             if (licenseBarText.includes('Expired')) {
@@ -398,6 +399,23 @@
                 return;
             }
             document.getElementById('pdfInput').click();
+        }
+
+        function isAcceptedPdfFile(file) {
+            if (!file || !file.name) return false;
+            const fileType = (file.type || '').toLowerCase();
+            return fileType === 'application/pdf' || /\.pdf$/i.test(file.name);
+        }
+
+        function openBlobUrl(url) {
+            window.location.href = url;
+        }
+
+        function setProcessingState(active) {
+            const processBtn = document.getElementById('processBtn');
+            if (!processBtn) return;
+            processBtn.disabled = active;
+            processBtn.textContent = active ? 'Processing…' : 'Select & Process PDF';
         }
 
         function clearPreviousMobileDownload() {
@@ -449,61 +467,70 @@
         document.getElementById('pdfInput').addEventListener('change', async function(e) {
             if (e.target.files.length > 0) {
                 const file = e.target.files[0];
+                if (!isAcceptedPdfFile(file)) {
+                    clearPreviousMobileDownload();
+                    clearDiag();
+                    setStatus('Please choose a PDF file ending in .pdf.', true);
+                    e.target.value = '';
+                    return;
+                }
                 await startProcessing(file);
                 e.target.value = ''; // Reset input
             }
         });
 
         async function startProcessing(file) {
+            if (isProcessing) {
+                setStatus('A document is already being processed.');
+                return;
+            }
+            isProcessing = true;
+            setProcessingState(true);
             clearPreviousMobileDownload();
             clearDiag();
             addDiag(`File: ${file.name} (${(file.size / 1024).toFixed(0)} KB)`);
             let pdfJsDoc = null;
+            let pdfJsLoadingTask = null;
             try {
                 setStatus(`Reading ${file.name}...`);
-                // Read the file into TWO independent ArrayBuffer copies — one for PDF.js
-                // (text extraction) and one for PDF-lib (page splitting). On iOS Safari,
-                // PDF.js's worker can detach/corrupt a shared buffer before PDF-lib reads it,
-                // causing getSize() to return invalid dimensions and misclassify every page.
-                // Read the file ONCE, then create two true independent copies via
-                // ArrayBuffer.slice(0). On iOS Safari, calling file.arrayBuffer()
-                // twice can return the same buffer; when PDF.js transfers it to its
-                // worker the original is detached, corrupting the copy PDF-lib needs.
                 const rawBuffer = await getFileArrayBuffer(file);
-                const arrayBuffer = rawBuffer.slice(0);
-                const arrayBuffer2 = rawBuffer.slice(0);
-                const arrayBuffer = await getFileArrayBuffer(file);
-                const arrayBuffer2 = await getFileArrayBuffer(file);
+                const pdfJsBuffer = rawBuffer.slice(0);
+                const pdfLibBuffer = rawBuffer.slice(0);
 
                 // ==========================================
                 // PHASE 1: TEXT EXTRACTION (PDF.js)
                 // ==========================================
                 setStatus("Phase 1: Analyzing page headers...");
-                pdfJsDoc = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer).slice(0) }).promise;
+                pdfJsLoadingTask = pdfjsLib.getDocument({ data: new Uint8Array(pdfJsBuffer.slice(0)) });
+                pdfJsDoc = await pdfJsLoadingTask.promise;
                 const pageCount = pdfJsDoc.numPages;
                 addDiag(`PDF.js loaded: ${pageCount} pages`);
 
                 let extractedHeaders = [];
                 let pdfJsPageDimensions = [];
                 for (let i = 1; i <= pageCount; i++) {
-                    if (i % 5 === 0) setStatus(`Reading headers: Page ${i} of ${pageCount}...`);
-                    const headerText = await extractHeaderPreview(pdfJsDoc, i);
-                    extractedHeaders.push(headerText);
-                    // Collect page dimensions from PDF.js as a fallback for iOS Safari
-                    const page = await pdfJsDoc.getPage(i);
-                    const viewport = page.getViewport({ scale: 1 });
-                    pdfJsPageDimensions.push({ width: viewport.width, height: viewport.height });
+                    if (i === 1 || i % 4 === 0 || i === pageCount) {
+                        setStatus(`Phase 1: Reading page ${i} of ${pageCount}...`);
+                        await yieldToUI();
+                    }
+                    const preview = await extractPagePreview(pdfJsDoc, i);
+                    extractedHeaders.push(preview.headerText);
+                    pdfJsPageDimensions.push({ width: preview.width, height: preview.height });
                 }
                 
                 await pdfJsDoc.destroy();
                 pdfJsDoc = null;
+                if (pdfJsLoadingTask) {
+                    await pdfJsLoadingTask.destroy();
+                    pdfJsLoadingTask = null;
+                }
                 
                 // ==========================================
                 // PHASE 2: STRUCTURAL SPLITTING (PDF-Lib)
                 // ==========================================
                 setStatus("Phase 2: Separating Legal and Letter pages...");
                 const { PDFDocument } = PDFLib;
-                const srcDoc = await PDFDocument.load(new Uint8Array(arrayBuffer2).slice(0));
+                const srcDoc = await PDFDocument.load(pdfLibBuffer);
                 addDiag(`PDF-lib loaded successfully`);
                 
                 const letterDoc = await PDFDocument.create();
@@ -521,7 +548,10 @@
                 let pageClassifications = [];
 
                 for (let i = 0; i < pageCount; i++) {
-                    if (i % 10 === 0) await yieldToUI();
+                    if (i === 0 || (i + 1) % 4 === 0 || i === pageCount - 1) {
+                        setStatus(`Phase 2: Classifying page ${i + 1} of ${pageCount}...`);
+                        await yieldToUI();
+                    }
                     const srcPage = srcDoc.getPage(i);
                     const { width, height } = srcPage.getSize();
                     let pageClass = classifyPageDimensions(width, height);
@@ -535,10 +565,6 @@
                         }
                     }
                     addDiag(`Page ${i+1}: ${width.toFixed(0)}x${height.toFixed(0)} → ${pageClass.type} (conf ${pageClass.confidence.toFixed(2)})`);
-                            console.log(`Page ${i+1}: PDF-lib dims invalid (${width}x${height}), using PDF.js fallback (${fb.width}x${fb.height}) → ${pageClass.type}`);
-                        }
-                    }
-                    console.log(`Page ${i+1}: ${width}x${height} → ${pageClass.type} (conf ${pageClass.confidence.toFixed(2)})`);
                     pageClassifications.push(pageClass);
 
                     const isLegal = pageClass.type === 'Legal';
@@ -547,15 +573,8 @@
                 }
 
                 // Copy pages in batches to reduce UI blocking while keeping memory usage controlled.
-                let copiedLetterPages = [];
-                if (letterIndices.length > 0) {
-                    copiedLetterPages = await letterDoc.copyPages(srcDoc, letterIndices);
-                }
-                
-                let copiedLegalPages = [];
-                if (legalIndices.length > 0) {
-                    copiedLegalPages = await legalDoc.copyPages(srcDoc, legalIndices);
-                }
+                const copiedLetterPages = await copyPagesWithYield(letterDoc, srcDoc, letterIndices, 'Phase 3: Copying Letter pages');
+                const copiedLegalPages = await copyPagesWithYield(legalDoc, srcDoc, legalIndices, 'Phase 3: Copying Legal pages');
 
                 let actualLetterPages = 0;
                 let actualLegalPages = 0;
@@ -660,7 +679,7 @@
                 } catch (e) { canWebShare = false; }
 
                 const dlButtonHtml = `
-                    <a href="${blobUrl}" download="${fileName}" target="_blank" id="mobileDlBtn" class="mt-6 block w-full px-6 py-4 bg-brandGreen hover:bg-green-700 text-white font-extrabold rounded shadow-lg border border-green-600 text-center">
+                    <a href="${blobUrl}" download="${fileName}" id="mobileDlBtn" class="mt-6 block w-full min-h-[44px] px-6 py-4 bg-brandGreen hover:bg-green-700 text-white font-extrabold rounded shadow-lg border border-green-600 text-center break-words">
                         ⬇️ TAP HERE TO DOWNLOAD ZIP ⬇️
                     </a>
                 `;
@@ -668,6 +687,8 @@
                 const tempDiv = document.createElement('div');
                 tempDiv.innerHTML = dlButtonHtml;
                 actionContainer.appendChild(tempDiv.firstElementChild);
+
+                const isMobileBrowser = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(navigator.userAgent);
 
                 if (isIOS && canWebShare) {
                     // iOS Safari: Web Share API is the primary path (blob downloads are blocked)
@@ -681,40 +702,56 @@
                                 await navigator.share({ files: [shareFile], title: fileName });
                                 dlBtn.textContent = '✓ SAVED!';
                             } catch (shareErr) {
-                                console.warn('Share cancelled', shareErr);
+                                if (shareErr && shareErr.name !== 'AbortError') {
+                                    console.warn('Share failed, opening blob URL', shareErr);
+                                    openBlobUrl(blobUrl);
+                                }
                                 dlBtn.textContent = '⬇️ TAP HERE TO DOWNLOAD ZIP ⬇️';
                                 dlBtn.classList.remove('opacity-75');
                             }
                         });
                     }
                 } else {
-                    // Desktop and non-iOS: standard download
-                    try { saveAs(zipBlob, fileName); } catch (e) { console.warn('Auto-download suppressed.', e); }
-                    if (canWebShare) {
-                        const dlBtn = document.getElementById('mobileDlBtn');
-                        if (dlBtn) dlBtn.addEventListener('click', async (e) => {
-                            e.preventDefault();
-                            try { await navigator.share({ files: [shareFile], title: fileName }); }
-                            catch (shareErr) { console.warn('Share cancelled', shareErr); }
-                        });
+                    if (!isMobileBrowser) {
+                        try { saveAs(zipBlob, fileName); } catch (e) { console.warn('Auto-download suppressed.', e); }
                     }
                 }
-                setStatus('Success! Tap the green button above to save.', false, true);
+                setStatus(isMobileBrowser ? 'Success! Tap the green button above to save.' : 'Success! Your ZIP download should begin automatically.', false, true);
 
             } catch (err) {
                 console.error(err);
                 addDiag(`ERROR: ${err.message}`);
-                if (pdfJsDoc) await pdfJsDoc.destroy().catch(e => console.log(e));
                 setStatus('Error: ' + err.message, true);
+            } finally {
+                if (pdfJsDoc) await pdfJsDoc.destroy().catch(e => console.log(e));
+                if (pdfJsLoadingTask) await pdfJsLoadingTask.destroy().catch(e => console.log(e));
+                isProcessing = false;
+                setProcessingState(false);
+                checkLicensingState();
             }
         }
 
-        async function extractHeaderPreview(pdfJsDoc, pageNum) {
+        async function copyPagesWithYield(targetDoc, srcDoc, indices, label) {
+            const copiedPages = [];
+            for (let start = 0; start < indices.length; start += 4) {
+                const chunk = indices.slice(start, start + 4);
+                setStatus(`${label}: ${Math.min(start + chunk.length, indices.length)} of ${indices.length}...`);
+                copiedPages.push(...await targetDoc.copyPages(srcDoc, chunk));
+                await yieldToUI();
+            }
+            return copiedPages;
+        }
+
+        async function extractPagePreview(pdfJsDoc, pageNum) {
+            let page = null;
             try {
-                const page = await pdfJsDoc.getPage(pageNum);
+                page = await pdfJsDoc.getPage(pageNum);
+                const viewport = page.getViewport({ scale: 1 });
                 const textContent = await page.getTextContent();
                 
-                if (!textContent.items || textContent.items.length === 0) return '[Image Only / Blank Page]';
+                if (!textContent.items || textContent.items.length === 0) {
+                    return { headerText: '[Image Only / Blank Page]', width: viewport.width, height: viewport.height };
+                }
                 
                 let lines = {};
                 for (let item of textContent.items) {
@@ -757,10 +794,18 @@
                     }
                 }
 
-                return bestText ? bestText.substring(0, 85) : '[No identifying header found]';
+                return {
+                    headerText: bestText ? bestText.substring(0, 85) : '[No identifying header found]',
+                    width: viewport.width,
+                    height: viewport.height
+                };
             } catch (e) {
                 console.warn('Header Extraction Skipped:', e);
-                return '[Error reading text]';
+                return { headerText: '[Error reading text]', width: 0, height: 0 };
+            } finally {
+                if (page) {
+                    try { page.cleanup(); } catch (cleanupErr) { console.warn('PDF.js page cleanup skipped', cleanupErr); }
+                }
             }
         }
 
@@ -971,23 +1016,33 @@
             return doc.output('blob');
         }
 
-        // Fetch the server's Last-Modified header to display the real publish time
-        async function loadLastPublished() {
-            const el = document.getElementById('versionTimestamp');
+        function formatLastUpdated(value) {
+            const parsed = new Date(value);
+            if (!Number.isFinite(parsed.getTime())) return null;
+            const dateStr = parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            const timeStr = parsed.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true });
+            return `${dateStr}, ${timeStr}`;
+        }
+
+        async function loadLastUpdated() {
+            const el = document.getElementById('lastUpdated');
             try {
-                const resp = await fetch(window.location.pathname + '?t=' + Date.now(), { method: 'HEAD', cache: 'no-store' });
+                const currentPage = window.location.pathname + window.location.search;
+                const resp = await fetch(currentPage + (currentPage.includes('?') ? '&' : '?') + 't=' + Date.now(), { method: 'HEAD', cache: 'no-store' });
                 const lastMod = resp.headers.get('Last-Modified');
-                if (lastMod) {
-                    const d = new Date(lastMod);
-                    const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-                    const timeStr = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true });
-                    el.textContent = 'Last Published: ' + dateStr + ', ' + timeStr;
-                } else {
-                    el.textContent = 'Last Published: (unknown)';
+                const formatted = formatLastUpdated(lastMod) || formatLastUpdated(document.lastModified);
+                if (formatted) {
+                    el.textContent = 'Last updated: ' + formatted;
+                    return;
                 }
             } catch (e) {
-                el.textContent = 'Last Published: (offline)';
+                const fallback = formatLastUpdated(document.lastModified);
+                if (fallback) {
+                    el.textContent = 'Last updated: ' + fallback;
+                    return;
+                }
             }
+            el.textContent = 'Last updated: unavailable';
         }
 
         // Initialize App
@@ -995,8 +1050,7 @@
             updateUIState();
             checkLicensingState();
             initConnectionGuard();
-            loadLastPublished();
-            document.getElementById('versionTimestamp').textContent = 'Last Published: ' + LAST_UPDATED;
+            loadLastUpdated();
         });
 
         // --- Connection Guard Logic ---
@@ -1031,4 +1085,3 @@
     </script>
 </body>
 </html>
-

@@ -415,7 +415,7 @@
             };
         }
 
-        function validatePageAccounting(pageCount, pagesData, classifiedLetterCount, classifiedLegalCount, actualLetterPages, actualLegalPages, placeholderMode, placeholderCount, finalLetterCount, finalLegalCount, placeholderOutputPagesCreated) {
+        function validateClassifiedPageAccounting(pageCount, pagesData, classifiedLetterCount, classifiedLegalCount, actualLetterPages, actualLegalPages, placeholderMode, placeholderCount, finalLetterCount, finalLegalCount, placeholderOutputPagesCreated) {
             const uniqueOriginalPages = new Set();
             const uniqueLetterOutputPages = new Set();
             const uniqueLegalOutputPages = new Set();
@@ -426,7 +426,7 @@
                 }
                 uniqueOriginalPages.add(page.original_page);
                 if (page.size !== 'Letter' && page.size !== 'Legal') {
-                    throw new Error(`Page accounting validation failed: Unknown page classification at original page ${page.original_page}.`);
+                    throw new Error(`Page accounting validation failed: Unsupported page classification at original page ${page.original_page}.`);
                 }
 
                 if (page.size === 'Letter') {
@@ -700,7 +700,7 @@
 
                 pagesData.sort((a, b) => a.original_page - b.original_page);
 
-                validatePageAccounting(
+                validateClassifiedPageAccounting(
                     pageCount,
                     pagesData,
                     letterIndices.length,

@@ -377,27 +377,64 @@
             const ratio = longEdge / shortEdge;
             const letterTarget = 11 / 8.5;
             const legalTarget = 14 / 8.5;
+            const ratioTolerance = 0.12;
+            const dominanceMargin = 0.045;
 
             const exactLetter = (Math.abs(width - 612) <= 36 && Math.abs(height - 792) <= 36) ||
                 (Math.abs(width - 792) <= 36 && Math.abs(height - 612) <= 36);
             const exactLegal = (Math.abs(width - 612) <= 36 && Math.abs(height - 1008) <= 36) ||
                 (Math.abs(width - 1008) <= 36 && Math.abs(height - 612) <= 36);
 
-            if (exactLetter) {
-                return { type: 'Letter', confidence: 0.99, ratio, width, height };
-            }
-            if (exactLegal) {
-                return { type: 'Legal', confidence: 0.99, ratio, width, height };
-            }
+            if (exactLetter) return { type: 'Letter', confidence: 0.99, ratio, width, height };
+            if (exactLegal) return { type: 'Legal', confidence: 0.99, ratio, width, height };
 
             const letterDiff = Math.abs(ratio - letterTarget);
             const legalDiff = Math.abs(ratio - legalTarget);
 
-            if (ratio >= 1.45 || (legalDiff + 0.08) < letterDiff) {
-                return { type: 'Legal', confidence: Math.max(0.66, 1 - (legalDiff / 0.6)), ratio, width, height };
+            if (letterDiff <= ratioTolerance && (letterDiff + dominanceMargin) < legalDiff) {
+                return { type: 'Letter', confidence: Math.max(0.5, 1 - (letterDiff / ratioTolerance)), ratio, width, height };
+            }
+            if (legalDiff <= ratioTolerance && (legalDiff + dominanceMargin) < letterDiff) {
+                return { type: 'Legal', confidence: Math.max(0.5, 1 - (legalDiff / ratioTolerance)), ratio, width, height };
             }
 
-            return { type: 'Letter', confidence: Math.max(0.66, 1 - (letterDiff / 0.6)), ratio, width, height };
+            return {
+                type: 'Unknown',
+                confidence: 0,
+                ratio,
+                width,
+                height,
+                reason: `Unrecognized page ratio (${ratio.toFixed(3)})`
+            };
+        }
+
+        function validatePageAccounting(pageCount, pagesData, classifiedLetterCount, classifiedLegalCount, actualLetterPages, actualLegalPages, placeholderCount, finalLetterCount, finalLegalCount) {
+            const uniqueOriginalPages = new Set();
+            for (const page of pagesData) {
+                if (!Number.isInteger(page.original_page) || page.original_page < 1 || page.original_page > pageCount) {
+                    throw new Error(`Page accounting validation failed: Invalid original page reference (${page.original_page}).`);
+                }
+                uniqueOriginalPages.add(page.original_page);
+                if (page.size !== 'Letter' && page.size !== 'Legal') {
+                    throw new Error(`Page accounting validation failed: Unknown page classification at original page ${page.original_page}.`);
+                }
+            }
+
+            if (pagesData.length !== pageCount || uniqueOriginalPages.size !== pageCount) {
+                throw new Error(`Page accounting validation failed: expected ${pageCount} source pages represented exactly once, found ${uniqueOriginalPages.size}.`);
+            }
+            if ((actualLetterPages + actualLegalPages) !== pageCount) {
+                throw new Error(`Page accounting validation failed: Letter (${actualLetterPages}) + Legal (${actualLegalPages}) does not equal source count (${pageCount}).`);
+            }
+            if ((classifiedLetterCount + classifiedLegalCount) !== pageCount) {
+                throw new Error(`Page accounting validation failed: classified Letter (${classifiedLetterCount}) + classified Legal (${classifiedLegalCount}) does not equal source count (${pageCount}).`);
+            }
+            if (finalLegalCount !== classifiedLegalCount || finalLegalCount !== actualLegalPages) {
+                throw new Error(`Page accounting validation failed: Legal output pages (${finalLegalCount}) do not match classified Legal pages (${classifiedLegalCount}).`);
+            }
+            if (finalLetterCount !== (classifiedLetterCount + placeholderCount) || finalLetterCount !== (actualLetterPages + placeholderCount)) {
+                throw new Error(`Page accounting validation failed: final Letter output pages (${finalLetterCount}) do not equal Letter pages (${classifiedLetterCount}) + placeholders (${placeholderCount}).`);
+            }
         }
 
         document.getElementById('pdfInput').addEventListener('change', async function(e) {
@@ -411,9 +448,15 @@
         async function startProcessing(file) {
             clearPreviousMobileDownload();
             let pdfJsDoc = null;
+            let arrayBuffer = null;
+            let extractedHeaders = [];
+            let pageClassifications = [];
+            let pagesData = [];
+            let copiedLetterPages = [];
+            let copiedLegalPages = [];
             try {
                 setStatus(`Reading ${file.name}...`);
-                const arrayBuffer = await file.arrayBuffer();
+                arrayBuffer = await file.arrayBuffer();
                 
                 // ==========================================
                 // PHASE 1: TEXT EXTRACTION (PDF.js)
@@ -422,7 +465,6 @@
                 pdfJsDoc = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer).slice(0) }).promise;
                 const pageCount = pdfJsDoc.numPages;
                 
-                let extractedHeaders = [];
                 for (let i = 1; i <= pageCount; i++) {
                     if (i % 5 === 0) setStatus(`Reading headers: Page ${i} of ${pageCount}...`);
                     const headerText = await extractHeaderPreview(pdfJsDoc, i);
@@ -446,12 +488,12 @@
                 const isMethodExact = document.getElementById('methodExact').checked;
                 const placeholderMode = isPreserveYes ? (isMethodExact ? "Exact Page Preservation" : "One Placeholder Per Legal Section") : "None";
 
-                let pagesData = [];
                 let letterIndices = [];
                 let legalIndices = [];
                 let placeholderCount = 0;
                 let prevSize = null;
-                let pageClassifications = [];
+                const unknownPages = [];
+                const legalIndexSet = new Set();
 
                 for (let i = 0; i < pageCount; i++) {
                     const srcPage = srcDoc.getPage(i);
@@ -460,17 +502,31 @@
                     pageClassifications.push(pageClass);
 
                     const isLegal = pageClass.type === 'Legal';
-                    if (isLegal) legalIndices.push(i);
-                    else letterIndices.push(i);
+                    if (isLegal) {
+                        legalIndices.push(i);
+                        legalIndexSet.add(i);
+                    } else if (pageClass.type === 'Letter') {
+                        letterIndices.push(i);
+                    } else {
+                        unknownPages.push({
+                            page: i + 1,
+                            width: pageClass.width,
+                            height: pageClass.height,
+                            reason: pageClass.reason || 'Unknown page size'
+                        });
+                    }
+                }
+
+                if (unknownPages.length > 0) {
+                    const pagesList = unknownPages.map(p => p.page).join(', ');
+                    throw new Error(`Unable to classify page size for source page(s): ${pagesList}. Processing stopped for review.`);
                 }
 
                 // Copy pages in batches to reduce UI blocking while keeping memory usage controlled.
-                let copiedLetterPages = [];
                 if (letterIndices.length > 0) {
                     copiedLetterPages = await letterDoc.copyPages(srcDoc, letterIndices);
                 }
                 
-                let copiedLegalPages = [];
                 if (legalIndices.length > 0) {
                     copiedLegalPages = await legalDoc.copyPages(srcDoc, legalIndices);
                 }
@@ -484,13 +540,15 @@
 
                 for (let i = 0; i < pageCount; i++) {
                     const pageNum = i + 1;
-                    const pageClass = pageClassifications[i];
-                    const sizeStr = pageClass.type === 'Legal' ? 'Legal' : 'Letter';
+                    const pageClass = pageClassifications[i] || { type: 'Unknown', ratio: 0, confidence: 0 };
+                    const isLegal = legalIndexSet.has(i);
+                    const sizeStr = isLegal ? 'Legal' : 'Letter';
                     
                     let newLegalNum = null;
                     let newLetterNum = null;
+                    let placeholderOutputPage = null;
 
-                    if (pageClass.type === 'Legal') {
+                    if (isLegal) {
                         actualLegalPages++;
                         legalOutputPage++;
                         newLegalNum = legalOutputPage;
@@ -501,13 +559,13 @@
                         if (placeholderMode === "Exact Page Preservation") {
                             letterDoc.addPage([612, 792]);
                             letterOutputPage++;
-                            newLetterNum = letterOutputPage;
+                            placeholderOutputPage = letterOutputPage;
                             placeholderCount++;
                         } else if (placeholderMode === "One Placeholder Per Legal Section") {
                             if (prevSize !== "Legal") {
                                 letterDoc.addPage([612, 792]);
                                 letterOutputPage++;
-                                newLetterNum = letterOutputPage;
+                                placeholderOutputPage = letterOutputPage;
                                 placeholderCount++;
                             }
                         }
@@ -526,6 +584,7 @@
                         new_legal_page: newLegalNum,
                         letter_output_page: newLetterNum,
                         legal_output_page: newLegalNum,
+                        placeholder_output_page: placeholderOutputPage,
                         aspect_ratio: pageClass.ratio,
                         confidence: pageClass.confidence,
                         width: pageClass.width,
@@ -534,6 +593,18 @@
                     
                     prevSize = sizeStr;
                 }
+
+                validatePageAccounting(
+                    pageCount,
+                    pagesData,
+                    letterIndices.length,
+                    legalIndices.length,
+                    actualLetterPages,
+                    actualLegalPages,
+                    placeholderCount,
+                    letterDoc.getPageCount(),
+                    legalDoc.getPageCount()
+                );
 
                 // ==========================================
                 // PHASE 4: REPORTS & PACKAGING
@@ -575,7 +646,11 @@
                 
                 const tempDiv = document.createElement('div');
                 tempDiv.innerHTML = dlButtonHtml;
-                actionContainer.appendChild(tempDiv.firstElementChild);
+                const mobileLink = tempDiv.firstElementChild;
+                mobileLink.addEventListener('click', () => {
+                    setTimeout(() => clearPreviousMobileDownload(), 30000);
+                }, { once: true });
+                actionContainer.appendChild(mobileLink);
 
                 try { saveAs(zipBlob, fileName); } catch (e) { console.warn('Auto-download suppressed.', e); }
                 setStatus('Success! Tap the green button above to save.', false, true);
@@ -585,6 +660,13 @@
                 if (pdfJsDoc) await pdfJsDoc.destroy().catch(e => console.log(e));
                 setStatus('An error occurred during processing.', true);
                 alert('Error: ' + err.message);
+            } finally {
+                extractedHeaders = [];
+                pageClassifications = [];
+                pagesData = [];
+                copiedLetterPages = [];
+                copiedLegalPages = [];
+                arrayBuffer = null;
             }
         }
 
@@ -668,6 +750,38 @@
             
             const marginX = 40;
             let cursorY = 50;
+            const pageHeight = doc.internal.pageSize.height;
+            const bottomMargin = 50;
+            const pagesByOriginal = new Map(pagesData.map(p => [p.original_page, p]));
+
+            function ensureSpace(requiredHeight = 14) {
+                if (cursorY + requiredHeight > pageHeight - bottomMargin) {
+                    doc.addPage();
+                    cursorY = 50;
+                }
+            }
+
+            function writeLine(text, step = 14) {
+                ensureSpace(step);
+                doc.text(text, marginX, cursorY);
+                cursorY += step;
+            }
+
+            function writeWrappedText(text, width, lineHeight = 12, extraSpacing = 0, x = marginX) {
+                const wrapped = doc.splitTextToSize(text, width);
+                const required = (wrapped.length * lineHeight) + extraSpacing;
+                ensureSpace(required);
+                doc.text(wrapped, x, cursorY);
+                cursorY += required;
+            }
+
+            function findPrecedingLetterPage(startOriginalPage) {
+                for (let i = startOriginalPage - 1; i >= 1; i--) {
+                    const candidate = pagesByOriginal.get(i);
+                    if (candidate && candidate.size === 'Letter') return candidate;
+                }
+                return null;
+            }
 
             doc.setFont('helvetica', 'bold');
             doc.setFontSize(18);
@@ -688,17 +802,17 @@
 
             doc.setFont('helvetica', 'normal');
             doc.setFontSize(10);
-            doc.text("Step 1: Print the '1_Letter_Pages.pdf' file on standard Letter (8.5 x 11) paper.", marginX, cursorY); cursorY += 16;
-            doc.text("Step 2: Print the '2_Legal_Pages.pdf' file on Legal (8.5 x 14) paper.", marginX, cursorY); cursorY += 16;
+            writeLine("Step 1: Print the '1_Letter_Pages.pdf' file on standard Letter (8.5 x 11) paper.", 16);
+            writeLine("Step 2: Print the '2_Legal_Pages.pdf' file on Legal (8.5 x 14) paper.", 16);
             
             if (pMode === 'None') {
-                doc.text('Step 3: Use the checklist below to insert your newly printed Legal pages into the Letter stack.', marginX, cursorY); cursorY += 25;
+                writeLine('Step 3: Use the checklist below to insert your newly printed Legal pages into the Letter stack.', 25);
             } else if (pMode === 'Exact Page Preservation') {
-                doc.text('Step 3: Your Letter stack contains blank placeholder pages where Legal pages belong.', marginX, cursorY); cursorY += 14;
-                doc.text('        Use the checklist below to swap the blank pages with your printed Legal pages.', marginX, cursorY); cursorY += 25;
+                writeLine('Step 3: Your Letter stack contains blank placeholder pages where Legal pages belong.', 14);
+                writeLine('        Use the checklist below to swap the blank pages with your printed Legal pages.', 25);
             } else {
-                doc.text('Step 3: Your Letter stack contains blank marker pages indicating Legal sections.', marginX, cursorY); cursorY += 14;
-                doc.text('        Use the checklist below to replace those blank markers with your printed Legal pages.', marginX, cursorY); cursorY += 25;
+                writeLine('Step 3: Your Letter stack contains blank marker pages indicating Legal sections.', 14);
+                writeLine('        Use the checklist below to replace those blank markers with your printed Legal pages.', 25);
             }
 
             doc.setFont('helvetica', 'bold');
@@ -708,15 +822,15 @@
             
             doc.setFont('helvetica', 'normal');
             doc.setFontSize(10);
-            doc.text(`File Name: ${filename}`, marginX, cursorY); cursorY += 14;
-            doc.text(`Original Pages: ${origCount}`, marginX, cursorY); cursorY += 20;
+            writeLine(`File Name: ${filename}`, 14);
+            writeLine(`Original Pages: ${origCount}`, 20);
             
-            doc.text(`Letter Pages: ${letterCount}`, marginX, cursorY); cursorY += 14;
-            doc.text(`Legal Pages: ${legalCount}`, marginX, cursorY); cursorY += 20;
+            writeLine(`Letter Pages: ${letterCount}`, 14);
+            writeLine(`Legal Pages: ${legalCount}`, 20);
             
-            doc.text(`Placeholder Mode: ${pMode}`, marginX, cursorY); cursorY += 14;
-            doc.text(`Placeholder Pages Added: ${pCount}`, marginX, cursorY); cursorY += 14;
-            doc.text(`Final Letter PDF Pages: ${finalLetterCount}`, marginX, cursorY); cursorY += 30;
+            writeLine(`Placeholder Mode: ${pMode}`, 14);
+            writeLine(`Placeholder Pages Added: ${pCount}`, 14);
+            writeLine(`Final Letter PDF Pages: ${finalLetterCount}`, 30);
 
             doc.setFont('helvetica', 'bold');
             doc.setFontSize(14);
@@ -725,9 +839,7 @@
             doc.setTextColor(255, 0, 0);
             doc.setFontSize(10);
             const disclaimerText = "The document header shown below is provided only as a reference. ALWAYS use the Original Page Number and 'Insert After' Number as the authoritative instruction for reassembly. The placeholder pages are only there to preserve position.";
-            const splitDisclaimer = doc.splitTextToSize(disclaimerText, doc.internal.pageSize.width - (marginX * 2));
-            doc.text(splitDisclaimer, marginX, cursorY);
-            cursorY += (splitDisclaimer.length * 12) + 15;
+            writeWrappedText(disclaimerText, doc.internal.pageSize.width - (marginX * 2), 12, 15);
             doc.setTextColor(0, 0, 0);
 
             doc.setFont('helvetica', 'bold');
@@ -738,27 +850,14 @@
             doc.setFontSize(10);
             
             if (legalGroups.length === 0) {
-                doc.text('No legal pages found in this document.', marginX, cursorY);
+                writeLine('No legal pages found in this document.', 14);
             } else {
                 for (let group of legalGroups) {
-                    if (cursorY > doc.internal.pageSize.height - 100) {
-                        doc.addPage();
-                        cursorY = 50;
-                    }
-
                     const startPage = group[0].original_page;
                     const endPage = group[group.length-1].original_page;
-                    const newStart = group[0].new_legal_page;
-                    const newEnd = group[group.length-1].new_legal_page;
-                    
-                    let precedingLetterPage = null;
-                    for (let i = startPage - 1; i >= 1; i--) {
-                        const candidate = pagesData.find(p => p.original_page === i);
-                        if (candidate && candidate.size === 'Letter') {
-                            precedingLetterPage = candidate;
-                            break;
-                        }
-                    }
+                    const newStart = group[0].legal_output_page;
+                    const newEnd = group[group.length-1].legal_output_page;
+                    const precedingLetterPage = findPrecedingLetterPage(startPage);
                     
                     const insertAfter = precedingLetterPage ? precedingLetterPage.original_page : 0;
                     const precedingLetterOutputPage = precedingLetterPage ? precedingLetterPage.letter_output_page : 0;
@@ -772,21 +871,22 @@
                     }
                     
                     doc.setFont('helvetica', 'bold');
-                    doc.text(l1, marginX, cursorY); cursorY += 12;
+                    writeWrappedText(l1, doc.internal.pageSize.width - (marginX * 2), 12, 0);
                     
                     doc.setFont('helvetica', 'normal');
                     if (insertAfter === 0) {
-                        doc.text('     Place at the very beginning of the document stack.', marginX, cursorY); cursorY += 12;
+                        writeWrappedText('     Place at the very beginning of the document stack.', doc.internal.pageSize.width - (marginX * 2), 12, 0);
                     } else {
-                        doc.text(`     Insert after Original PDF Page ${insertAfter} (Letter output page ${precedingLetterOutputPage}).`, marginX, cursorY); cursorY += 12;
+                        writeWrappedText(`     Insert after Original PDF Page ${insertAfter} (Letter output page ${precedingLetterOutputPage}).`, doc.internal.pageSize.width - (marginX * 2), 12, 0);
                         
                         doc.setFont('helvetica', 'italic');
                         doc.setTextColor(100, 100, 100);
-                        const ptSplit = doc.splitTextToSize(`     Header reference at the top of that page: "${precedingText}"`, doc.internal.pageSize.width - (marginX * 2) - 20);
-                        doc.text(ptSplit, marginX, cursorY);
-                        cursorY += (ptSplit.length * 12) + 8;
+                        writeWrappedText(`     Header reference at the top of that page: "${precedingText}"`, doc.internal.pageSize.width - (marginX * 2) - 20, 12, 8);
                         doc.setTextColor(0, 0, 0);
+                        doc.setFont('helvetica', 'normal');
                     }
+
+                    ensureSpace(8);
                     cursorY += 8;
                 }
             }
@@ -806,17 +906,9 @@
                 for (let group of legalGroups) {
                     const startPage = group[0].original_page;
                     const endPage = group[group.length-1].original_page;
-                    const newStart = group[0].new_legal_page;
-                    const newEnd = group[group.length-1].new_legal_page;
-                    
-                    let precedingLetterPage = null;
-                    for (let i = startPage - 1; i >= 1; i--) {
-                        const candidate = pagesData.find(p => p.original_page === i);
-                        if (candidate && candidate.size === 'Letter') {
-                            precedingLetterPage = candidate;
-                            break;
-                        }
-                    }
+                    const newStart = group[0].legal_output_page;
+                    const newEnd = group[group.length-1].legal_output_page;
+                    const precedingLetterPage = findPrecedingLetterPage(startPage);
                     
                     const insertAfter = precedingLetterPage ? precedingLetterPage.original_page : 0;
                     const precedingLetterOutputPage = precedingLetterPage ? precedingLetterPage.letter_output_page : 0;
@@ -855,6 +947,7 @@
             updateUIState();
             checkLicensingState();
             initConnectionGuard();
+            window.addEventListener('beforeunload', clearPreviousMobileDownload);
         });
 
         // --- Connection Guard Logic ---

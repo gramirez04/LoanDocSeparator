@@ -580,9 +580,7 @@
                 setStatus("Phase 2: Separating Legal and Letter pages...");
                 const { PDFDocument } = PDFLib;
                 const srcBytes = new Uint8Array(arrayBuffer);
-                const srcDocClassify = await PDFDocument.load(srcBytes);
-                const srcDocLetter = await PDFDocument.load(srcBytes);
-                const srcDocLegal = await PDFDocument.load(srcBytes);
+                const srcDocClassify = await PDFDocument.load(srcBytes.slice(0));
                 
                 const letterDoc = await PDFDocument.create();
                 const legalDoc = await PDFDocument.create();
@@ -645,8 +643,8 @@
                     for (let j = runStart; j <= runEnd; j++) runIndices.push(j);
 
                     if (runIsLegal) {
-                        const copiedLegalRun = await legalDoc.copyPages(srcDocLegal, runIndices);
-                        for (let runOffset = 0; runOffset < copiedLegalRun.length; runOffset++) {
+                        const embeddedLegalRun = await legalDoc.embedPdf(srcBytes, runIndices);
+                        for (let runOffset = 0; runOffset < embeddedLegalRun.length; runOffset++) {
                             const pageIndex = runStart + runOffset;
                             if (builtCount % 5 === 0) setStatus(`Phase 3: Building outputs (${builtCount + 1}/${pageCount})...`);
                             const pageNum = pageIndex + 1;
@@ -659,7 +657,9 @@
                             actualLegalPages++;
                             legalOutputPage++;
                             newLegalNum = legalOutputPage;
-                            legalDoc.addPage(copiedLegalRun[runOffset]);
+                            const embeddedLegalPage = embeddedLegalRun[runOffset];
+                            const legalOutPage = legalDoc.addPage([embeddedLegalPage.width, embeddedLegalPage.height]);
+                            legalOutPage.drawPage(embeddedLegalPage);
 
                             if (placeholderMode === "Exact Page Preservation") {
                                 letterDoc.addPage([612, 792]);
@@ -695,8 +695,8 @@
                             builtCount++;
                         }
                     } else {
-                        const copiedLetterRun = await letterDoc.copyPages(srcDocLetter, runIndices);
-                        for (let runOffset = 0; runOffset < copiedLetterRun.length; runOffset++) {
+                        const embeddedLetterRun = await letterDoc.embedPdf(srcBytes, runIndices);
+                        for (let runOffset = 0; runOffset < embeddedLetterRun.length; runOffset++) {
                             const pageIndex = runStart + runOffset;
                             if (builtCount % 5 === 0) setStatus(`Phase 3: Building outputs (${builtCount + 1}/${pageCount})...`);
                             const pageNum = pageIndex + 1;
@@ -709,7 +709,9 @@
                             actualLetterPages++;
                             letterOutputPage++;
                             newLetterNum = letterOutputPage;
-                            letterDoc.addPage(copiedLetterRun[runOffset]);
+                            const embeddedLetterPage = embeddedLetterRun[runOffset];
+                            const letterOutPage = letterDoc.addPage([embeddedLetterPage.width, embeddedLetterPage.height]);
+                            letterOutPage.drawPage(embeddedLetterPage);
 
                             pagesData.push({
                                 original_page: pageNum,

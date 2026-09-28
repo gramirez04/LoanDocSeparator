@@ -218,12 +218,7 @@
         const ADMIN_MASTER_KEY = "SL-ADMIN-GERMAN-2026";
         const BETA_PASSWORD = "SLTRIAL";
         const BETA_EXPIRATION_DATE = new Date("2026-10-03T23:59:59"); // Expires Oct 3, 2026
-        const LAST_UPDATED = (() => {
-            const d = new Date();
-            const dateStr = d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-            const timeStr = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true });
-            return dateStr + ' at ' + timeStr;
-        })();
+        const LAST_UPDATED = "Sept 28, 2026, 11:40:00 AM";
         let hwid = generateMockHWID();
         let isSessionUnlocked = false; // Requires password every time the app opens
         let currentDownloadUrl = null;
@@ -434,20 +429,30 @@
             let pdfJsDoc = null;
             try {
                 setStatus(`Reading ${file.name}...`);
+                // Read the file into TWO independent ArrayBuffer copies — one for PDF.js
+                // (text extraction) and one for PDF-lib (page splitting). On iOS Safari,
+                // PDF.js's worker can detach/corrupt a shared buffer before PDF-lib reads it,
+                // causing getSize() to return invalid dimensions and misclassify every page.
                 const arrayBuffer = await getFileArrayBuffer(file);
-                
+                const arrayBuffer2 = await getFileArrayBuffer(file);
+
                 // ==========================================
                 // PHASE 1: TEXT EXTRACTION (PDF.js)
                 // ==========================================
                 setStatus("Phase 1: Analyzing page headers...");
                 pdfJsDoc = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer).slice(0) }).promise;
                 const pageCount = pdfJsDoc.numPages;
-                
+
                 let extractedHeaders = [];
+                let pdfJsPageDimensions = [];
                 for (let i = 1; i <= pageCount; i++) {
                     if (i % 5 === 0) setStatus(`Reading headers: Page ${i} of ${pageCount}...`);
                     const headerText = await extractHeaderPreview(pdfJsDoc, i);
                     extractedHeaders.push(headerText);
+                    // Collect page dimensions from PDF.js as a fallback for iOS Safari
+                    const page = await pdfJsDoc.getPage(i);
+                    const viewport = page.getViewport({ scale: 1 });
+                    pdfJsPageDimensions.push({ width: viewport.width, height: viewport.height });
                 }
                 
                 await pdfJsDoc.destroy();
@@ -458,7 +463,7 @@
                 // ==========================================
                 setStatus("Phase 2: Separating Legal and Letter pages...");
                 const { PDFDocument } = PDFLib;
-                const srcDoc = await PDFDocument.load(new Uint8Array(arrayBuffer).slice(0));
+                const srcDoc = await PDFDocument.load(new Uint8Array(arrayBuffer2).slice(0));
                 
                 const letterDoc = await PDFDocument.create();
                 const legalDoc = await PDFDocument.create();
@@ -478,7 +483,17 @@
                     if (i % 10 === 0) await yieldToUI();
                     const srcPage = srcDoc.getPage(i);
                     const { width, height } = srcPage.getSize();
-                    const pageClass = classifyPageDimensions(width, height);
+                    let pageClass = classifyPageDimensions(width, height);
+
+                    // iOS Safari fallback: if PDF-lib returns invalid dimensions, use PDF.js dimensions
+                    if (pageClass.type === 'Unknown' && pdfJsPageDimensions[i]) {
+                        const fb = pdfJsPageDimensions[i];
+                        if (fb.width > 0 && fb.height > 0) {
+                            pageClass = classifyPageDimensions(fb.width, fb.height);
+                            console.log(`Page ${i+1}: PDF-lib dims invalid (${width}x${height}), using PDF.js fallback (${fb.width}x${fb.height}) → ${pageClass.type}`);
+                        }
+                    }
+                    console.log(`Page ${i+1}: ${width}x${height} → ${pageClass.type} (conf ${pageClass.confidence.toFixed(2)})`);
                     pageClassifications.push(pageClass);
 
                     const isLegal = pageClass.type === 'Legal';
@@ -589,22 +604,46 @@
                 const blobUrl = URL.createObjectURL(zipBlob);
                 currentDownloadUrl = blobUrl;
                 const actionContainer = document.getElementById('processBtn').parentElement;
-                
+
+                const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+                const shareFile = new File([zipBlob], fileName, { type: 'application/zip' });
+                let canWebShare = false;
+                try {
+                    canWebShare = typeof navigator.share === 'function' && typeof navigator.canShare === 'function' && navigator.canShare({ files: [shareFile] });
+                } catch (e) { canWebShare = false; }
+
                 const dlButtonHtml = `
                     <a href="${blobUrl}" download="${fileName}" target="_blank" id="mobileDlBtn" class="mt-6 block w-full px-6 py-4 bg-brandGreen hover:bg-green-700 text-white font-extrabold rounded shadow-lg border border-green-600 text-center">
                         ⬇️ TAP HERE TO DOWNLOAD ZIP ⬇️
                     </a>
                 `;
-                
+
                 const tempDiv = document.createElement('div');
                 tempDiv.innerHTML = dlButtonHtml;
                 actionContainer.appendChild(tempDiv.firstElementChild);
 
-                try { saveAs(zipBlob, fileName); } catch (e) { console.warn('Auto-download suppressed.', e); }
-                // Mobile fallback: use Web Share API if available (iOS Safari blocks blob downloads)
-                try {
-                    const shareFile = new File([zipBlob], fileName, { type: 'application/zip' });
-                    if (navigator.share && navigator.canShare && navigator.canShare({ files: [shareFile] })) {
+                if (isIOS && canWebShare) {
+                    // iOS Safari: Web Share API is the primary path (blob downloads are blocked)
+                    const dlBtn = document.getElementById('mobileDlBtn');
+                    if (dlBtn) {
+                        dlBtn.addEventListener('click', async (e) => {
+                            e.preventDefault();
+                            dlBtn.textContent = '⏳ SHARING…';
+                            dlBtn.classList.add('opacity-75');
+                            try {
+                                await navigator.share({ files: [shareFile], title: fileName });
+                                dlBtn.textContent = '✓ SAVED!';
+                            } catch (shareErr) {
+                                console.warn('Share cancelled', shareErr);
+                                dlBtn.textContent = '⬇️ TAP HERE TO DOWNLOAD ZIP ⬇️';
+                                dlBtn.classList.remove('opacity-75');
+                            }
+                        });
+                    }
+                } else {
+                    // Desktop and non-iOS: standard download
+                    try { saveAs(zipBlob, fileName); } catch (e) { console.warn('Auto-download suppressed.', e); }
+                    if (canWebShare) {
                         const dlBtn = document.getElementById('mobileDlBtn');
                         if (dlBtn) dlBtn.addEventListener('click', async (e) => {
                             e.preventDefault();
@@ -612,7 +651,7 @@
                             catch (shareErr) { console.warn('Share cancelled', shareErr); }
                         });
                     }
-                } catch (shareCheckErr) { console.warn('Web Share API not available', shareCheckErr); }
+                }
                 setStatus('Success! Tap the green button above to save.', false, true);
 
             } catch (err) {
@@ -890,7 +929,7 @@
             updateUIState();
             checkLicensingState();
             initConnectionGuard();
-            document.getElementById('versionTimestamp').textContent = 'Last Updated: ' + LAST_UPDATED;
+            document.getElementById('versionTimestamp').textContent = 'Last Published: ' + LAST_UPDATED;
         });
 
         // --- Connection Guard Logic ---
@@ -925,3 +964,4 @@
     </script>
 </body>
 </html>
+

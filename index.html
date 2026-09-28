@@ -430,10 +430,10 @@
                 throw new Error(`Page accounting validation failed: classified Letter (${classifiedLetterCount}) + classified Legal (${classifiedLegalCount}) does not equal source count (${pageCount}).`);
             }
             if (finalLegalCount !== classifiedLegalCount || finalLegalCount !== actualLegalPages) {
-                throw new Error(`Page accounting validation failed: Legal output pages (${finalLegalCount}) do not match classified Legal pages (${classifiedLegalCount}).`);
+                throw new Error(`Page accounting validation failed: Legal output pages (${finalLegalCount}) do not match classified Legal pages (${classifiedLegalCount}) and actual Legal pages (${actualLegalPages}).`);
             }
             if (finalLetterCount !== (classifiedLetterCount + placeholderCount) || finalLetterCount !== (actualLetterPages + placeholderCount)) {
-                throw new Error(`Page accounting validation failed: final Letter output pages (${finalLetterCount}) do not equal Letter pages (${classifiedLetterCount}) + placeholders (${placeholderCount}).`);
+                throw new Error(`Page accounting validation failed: final Letter output pages (${finalLetterCount}) do not equal classified Letter pages (${classifiedLetterCount}) + placeholders (${placeholderCount}) and actual Letter pages (${actualLetterPages}) + placeholders (${placeholderCount}).`);
             }
         }
 

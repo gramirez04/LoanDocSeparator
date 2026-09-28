@@ -611,7 +611,9 @@
                 }
 
                 if (unknownPages.length > 0) {
-                    const pagesList = unknownPages.map(p => p.page).join(', ');
+                    const pagesList = unknownPages
+                        .map(p => `#${p.page} (${p.reason}; ${Number(p.width || 0).toFixed(2)}x${Number(p.height || 0).toFixed(2)})`)
+                        .join(', ');
                     throw new Error(`Unable to classify page size for source page(s): ${pagesList}. Processing stopped for review.`);
                 }
 
@@ -875,7 +877,7 @@
                         const numericParts = colorValue.split(/\s+/).map(Number).filter(Number.isFinite);
                         doc.setTextColor(...numericParts);
                     } else {
-                        doc.setTextColor(0, 0, 0);
+                        doc.setTextColor(colorValue);
                     }
                 }
             }

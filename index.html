@@ -415,7 +415,7 @@
             };
         }
 
-        function validatePageAccounting(pageCount, pagesData, classifiedLetterCount, classifiedLegalCount, actualLetterPages, actualLegalPages, placeholderMode, placeholderCount, finalLetterCount, finalLegalCount) {
+        function validatePageAccounting(pageCount, pagesData, classifiedLetterCount, classifiedLegalCount, actualLetterPages, actualLegalPages, placeholderMode, placeholderCount, finalLetterCount, finalLegalCount, placeholderOutputPagesCreated) {
             const uniqueOriginalPages = new Set();
             const uniqueLetterOutputPages = new Set();
             const uniqueLegalOutputPages = new Set();
@@ -518,6 +518,9 @@
                     if (page.placeholder_output_page > finalLetterCount) {
                         throw new Error(`Page accounting validation failed: placeholder output page mapping (${page.placeholder_output_page}) exceeds final Letter output page count (${finalLetterCount}).`);
                     }
+                    if (!placeholderOutputPagesCreated.has(page.placeholder_output_page)) {
+                        throw new Error(`Page accounting validation failed: placeholder output page mapping (${page.placeholder_output_page}) does not reference a generated placeholder page.`);
+                    }
                     if (uniquePlaceholderOutputPages.has(page.placeholder_output_page)) {
                         throw new Error(`Page accounting validation failed: Duplicate placeholder output page mapping (${page.placeholder_output_page}).`);
                     }
@@ -527,6 +530,9 @@
 
             if (uniquePlaceholderOutputPages.size !== placeholderCount) {
                 throw new Error(`Page accounting validation failed: mapped placeholder pages (${uniquePlaceholderOutputPages.size}) do not match placeholder count (${placeholderCount}).`);
+            }
+            if (placeholderOutputPagesCreated.size !== placeholderCount) {
+                throw new Error(`Page accounting validation failed: generated placeholder pages (${placeholderOutputPagesCreated.size}) do not match placeholder count (${placeholderCount}).`);
             }
         }
 
@@ -587,6 +593,7 @@
                 let prevSize = null;
                 const unknownPages = [];
                 const legalIndexSet = new Set();
+                const placeholderOutputPagesCreated = new Set();
 
                 for (let i = 0; i < pageCount; i++) {
                     const srcPage = srcDoc.getPage(i);
@@ -655,12 +662,14 @@
                             letterDoc.addPage([612, 792]);
                             letterOutputPage++;
                             placeholderOutputPage = letterOutputPage;
+                            placeholderOutputPagesCreated.add(placeholderOutputPage);
                             placeholderCount++;
                         } else if (placeholderMode === "One Placeholder Per Legal Section") {
                             if (prevSize !== "Legal") {
                                 letterDoc.addPage([612, 792]);
                                 letterOutputPage++;
                                 placeholderOutputPage = letterOutputPage;
+                                placeholderOutputPagesCreated.add(placeholderOutputPage);
                                 placeholderCount++;
                             }
                         }
@@ -701,7 +710,8 @@
                     placeholderMode,
                     placeholderCount,
                     letterDoc.getPageCount(),
-                    legalDoc.getPageCount()
+                    legalDoc.getPageCount(),
+                    placeholderOutputPagesCreated
                 );
 
                 // ==========================================
@@ -903,6 +913,7 @@
                 let lineIndex = 0;
 
                 while (lineIndex < wrapped.length) {
+                    ensureSpace(lineHeight);
                     const pageHeight = getPageHeight();
                     const availableHeight = (pageHeight - bottomMargin) - cursorY;
                     const linesFit = Math.max(1, Math.floor(availableHeight / lineHeight));

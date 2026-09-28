@@ -65,8 +65,8 @@
         
         <!-- Top Utility Bar -->
         <div class="bg-slate-50 border-b border-slate-200 px-4 py-3 flex justify-between items-center">
-            <button onclick="downloadApp()" class="text-xs font-bold text-brandBlue hover:text-brandGreen flex items-center transition-colors shadow-sm bg-white border border-slate-200 px-3 py-1.5 rounded-md">
-                <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+            <button onclick="downloadApp()" class="text-xs font-bold text-brandBlue hover:text-brandGreen flex items-center transition-colors shadow-sm bg-white border border-slate-200 px-3 py-1.5 rounded">
+                <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
                 Save App to PC
             </button>
             <div id="connectionIndicator" class="transition-all duration-300">
@@ -197,7 +197,7 @@
             <div class="space-y-4">
                 <div>
                     <label class="block text-xs font-bold text-slate-700 mb-1">Beta Password:</label>
-                    <input type="text" id="licenseKeyInput" class="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-brandBlue" placeholder="Enter password here">
+                    <input type="text" id="licenseKeyInput" class="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-brandBlue" placeholder="Enter password">
                 </div>
                 <p id="hwidDisplay" class="text-xs text-slate-400 font-mono hidden"></p>
                 <button onclick="activateSoftware()" class="w-full py-2 bg-brandBlue hover:bg-brandGreen text-white font-bold rounded shadow transition-colors">
@@ -281,7 +281,7 @@
                 
                 const isMethodExact = document.getElementById('methodExact').checked;
                 if (isMethodExact) {
-                    explanation.innerHTML = "► A blank Letter page will be inserted into the Letter PDF for every single Legal page removed. The Letter PDF page count will match the original file count exactly.";
+                    explanation.innerHTML = "► A blank Letter page will be inserted into the Letter PDF for every single Legal page removed. The Letter PDF page count will match the original file count.";
                 } else {
                     explanation.innerHTML = "► A single blank Letter page will be inserted into the Letter PDF just to mark the spot where a continuous group of Legal pages was removed.";
                 }
@@ -568,7 +568,7 @@
                 const actionContainer = document.getElementById('processBtn').parentElement;
                 
                 const dlButtonHtml = `
-                    <a href="${blobUrl}" download="${fileName}" id="mobileDlBtn" class="mt-6 block w-full px-6 py-4 bg-brandGreen hover:bg-green-700 text-white font-extrabold rounded shadow-lg border-2 border-green-600 animate-pulse text-center text-lg transition-colors">
+                    <a href="${blobUrl}" download="${fileName}" id="mobileDlBtn" class="mt-6 block w-full px-6 py-4 bg-brandGreen hover:bg-green-700 text-white font-extrabold rounded shadow-lg border border-green-600 text-center">
                         ⬇️ TAP HERE TO DOWNLOAD ZIP ⬇️
                     </a>
                 `;
@@ -724,7 +724,7 @@
             
             doc.setTextColor(255, 0, 0);
             doc.setFontSize(10);
-            const disclaimerText = "The document header shown below is provided only as a reference. ALWAYS use the Original Page Number and 'Insert After' Number as the authoritative instruction for reassembly. The placeholder pages are only there to preserve position.";
+            const disclaimerText = "The document header shown below is provided only as a reference. ALWAYS use the Original Page Number and 'Insert After' Number as the authoritative instruction for reassembly.";
             const splitDisclaimer = doc.splitTextToSize(disclaimerText, doc.internal.pageSize.width - (marginX * 2));
             doc.text(splitDisclaimer, marginX, cursorY);
             cursorY += (splitDisclaimer.length * 12) + 15;

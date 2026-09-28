@@ -825,19 +825,17 @@
             }
 
             function ensureSpace(requiredHeight = 14) {
-                if (cursorY + requiredHeight > pageHeight - bottomMargin) {
+                const usableHeight = (pageHeight - bottomMargin) - 50;
+                while (cursorY + requiredHeight > pageHeight - bottomMargin) {
                     addPageWithCurrentState();
+                    if (requiredHeight > usableHeight) break;
                 }
             }
 
             function writeLine(text, step = 14) {
-                const wrapped = doc.splitTextToSize(text, doc.internal.pageSize.width - (marginX * 2));
                 const lineHeight = 12;
                 const extraSpacing = Math.max(0, step - lineHeight);
-                const required = (wrapped.length * lineHeight) + extraSpacing;
-                ensureSpace(required);
-                doc.text(wrapped, marginX, cursorY);
-                cursorY += required;
+                writeWrappedText(text, doc.internal.pageSize.width - (marginX * 2), lineHeight, extraSpacing);
             }
 
             function writeWrappedText(text, width, lineHeight = 12, extraSpacing = 0) {

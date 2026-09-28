@@ -842,9 +842,12 @@
             
             const marginX = 40;
             let cursorY = 50;
-            const pageHeight = doc.internal.pageSize.height;
             const bottomMargin = 50;
             const pagesByOriginal = new Map(pagesData.map(p => [p.original_page, p]));
+
+            function getPageHeight() {
+                return doc.internal.pageSize.getHeight();
+            }
 
             function addPageWithCurrentState() {
                 const currentFont = doc.getFont();
@@ -869,9 +872,11 @@
             }
 
             function ensureSpace(requiredHeight = 14) {
-                const usableHeight = (pageHeight - bottomMargin) - 50;
-                const normalizedRequired = Math.min(requiredHeight, usableHeight);
-                while (cursorY + normalizedRequired > pageHeight - bottomMargin) {
+                while (true) {
+                    const pageHeight = getPageHeight();
+                    const usableHeight = (pageHeight - bottomMargin) - 50;
+                    const normalizedRequired = Math.min(requiredHeight, usableHeight);
+                    if (cursorY + normalizedRequired <= pageHeight - bottomMargin) break;
                     addPageWithCurrentState();
                 }
             }
@@ -887,6 +892,7 @@
                 let lineIndex = 0;
 
                 while (lineIndex < wrapped.length) {
+                    const pageHeight = getPageHeight();
                     const availableHeight = (pageHeight - bottomMargin) - cursorY;
                     const linesFit = Math.max(1, Math.floor(availableHeight / lineHeight));
                     const segment = wrapped.slice(lineIndex, lineIndex + linesFit);

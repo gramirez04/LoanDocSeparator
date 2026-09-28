@@ -680,6 +680,8 @@
                     prevSize = sizeStr;
                 }
 
+                pagesData.sort((a, b) => a.original_page - b.original_page);
+
                 validatePageAccounting(
                     pageCount,
                     pagesData,
@@ -752,13 +754,6 @@
                 if (pdfJsDoc) await pdfJsDoc.destroy().catch(e => console.log(e));
                 setStatus('An error occurred during processing.', true);
                 alert('Error: ' + err.message);
-            } finally {
-                extractedHeaders = [];
-                pageClassifications = [];
-                pagesData = [];
-                copiedLetterPages = [];
-                copiedLegalPages = [];
-                arrayBuffer = null;
             }
         }
 

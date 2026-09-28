@@ -896,6 +896,9 @@
                 while (true) {
                     const pageHeight = getPageHeight();
                     const usableHeight = (pageHeight - bottomMargin) - 50;
+                    if (usableHeight <= 0) {
+                        throw new Error('Report generation failed: printable page height is invalid.');
+                    }
                     const normalizedRequired = Math.min(requiredHeight, usableHeight);
                     if (cursorY + normalizedRequired <= pageHeight - bottomMargin) break;
                     addPageWithCurrentState();

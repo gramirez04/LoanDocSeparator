@@ -508,6 +508,9 @@
                 }
 
                 if (hasPlaceholder) {
+                    if (page.placeholder_output_page > finalLetterCount) {
+                        throw new Error(`Page accounting validation failed: placeholder output page mapping (${page.placeholder_output_page}) exceeds final Letter output page count (${finalLetterCount}).`);
+                    }
                     if (uniquePlaceholderOutputPages.has(page.placeholder_output_page)) {
                         throw new Error(`Page accounting validation failed: Duplicate placeholder output page mapping (${page.placeholder_output_page}).`);
                     }

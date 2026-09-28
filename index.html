@@ -410,6 +410,8 @@
 
         function validatePageAccounting(pageCount, pagesData, classifiedLetterCount, classifiedLegalCount, actualLetterPages, actualLegalPages, placeholderCount, finalLetterCount, finalLegalCount) {
             const uniqueOriginalPages = new Set();
+            const uniqueLetterOutputPages = new Set();
+            const uniqueLegalOutputPages = new Set();
             for (const page of pagesData) {
                 if (!Number.isInteger(page.original_page) || page.original_page < 1 || page.original_page > pageCount) {
                     throw new Error(`Page accounting validation failed: Invalid original page reference (${page.original_page}).`);
@@ -417,6 +419,35 @@
                 uniqueOriginalPages.add(page.original_page);
                 if (page.size !== 'Letter' && page.size !== 'Legal') {
                     throw new Error(`Page accounting validation failed: Unknown page classification at original page ${page.original_page}.`);
+                }
+
+                if (page.size === 'Letter') {
+                    if (!Number.isInteger(page.letter_output_page) || page.letter_output_page < 1) {
+                        throw new Error(`Page accounting validation failed: Letter page ${page.original_page} is missing a valid Letter output page mapping.`);
+                    }
+                    if (uniqueLetterOutputPages.has(page.letter_output_page)) {
+                        throw new Error(`Page accounting validation failed: Duplicate Letter output page mapping (${page.letter_output_page}).`);
+                    }
+                    uniqueLetterOutputPages.add(page.letter_output_page);
+                    if (page.legal_output_page !== null) {
+                        throw new Error(`Page accounting validation failed: Letter page ${page.original_page} should not have a Legal output page mapping.`);
+                    }
+                }
+
+                if (page.size === 'Legal') {
+                    if (!Number.isInteger(page.legal_output_page) || page.legal_output_page < 1) {
+                        throw new Error(`Page accounting validation failed: Legal page ${page.original_page} is missing a valid Legal output page mapping.`);
+                    }
+                    if (uniqueLegalOutputPages.has(page.legal_output_page)) {
+                        throw new Error(`Page accounting validation failed: Duplicate Legal output page mapping (${page.legal_output_page}).`);
+                    }
+                    uniqueLegalOutputPages.add(page.legal_output_page);
+                    if (page.letter_output_page !== null) {
+                        throw new Error(`Page accounting validation failed: Legal page ${page.original_page} should not have a Letter output page mapping.`);
+                    }
+                    if (page.placeholder_output_page !== null && (!Number.isInteger(page.placeholder_output_page) || page.placeholder_output_page < 1)) {
+                        throw new Error(`Page accounting validation failed: Legal page ${page.original_page} has an invalid placeholder output page mapping.`);
+                    }
                 }
             }
 
@@ -440,6 +471,12 @@
             }
             if (finalLetterCount !== (actualLetterPages + placeholderCount)) {
                 throw new Error(`Page accounting validation failed: final Letter output pages (${finalLetterCount}) do not equal actual Letter pages (${actualLetterPages}) + placeholders (${placeholderCount}).`);
+            }
+            if (uniqueLetterOutputPages.size !== actualLetterPages) {
+                throw new Error(`Page accounting validation failed: mapped Letter output pages (${uniqueLetterOutputPages.size}) do not match actual Letter pages (${actualLetterPages}).`);
+            }
+            if (uniqueLegalOutputPages.size !== actualLegalPages) {
+                throw new Error(`Page accounting validation failed: mapped Legal output pages (${uniqueLegalOutputPages.size}) do not match actual Legal pages (${actualLegalPages}).`);
             }
         }
 
@@ -652,7 +689,15 @@
                 
                 const tempDiv = document.createElement('div');
                 tempDiv.innerHTML = dlButtonHtml;
-                const mobileLink = tempDiv.firstElementChild;
+                let mobileLink = tempDiv.firstElementChild;
+                if (!mobileLink) {
+                    mobileLink = document.createElement('a');
+                    mobileLink.href = blobUrl;
+                    mobileLink.download = fileName;
+                    mobileLink.id = 'mobileDlBtn';
+                    mobileLink.className = 'mt-6 block w-full px-6 py-4 bg-brandGreen hover:bg-green-700 text-white font-extrabold rounded shadow-lg border-2 border-green-600 animate-pulse text-center text-lg transition-colors';
+                    mobileLink.textContent = '⬇️ TAP HERE TO DOWNLOAD ZIP ⬇️';
+                }
                 actionContainer.appendChild(mobileLink);
 
                 try { saveAs(zipBlob, fileName); } catch (e) { console.warn('Auto-download suppressed.', e); }

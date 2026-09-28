@@ -421,7 +421,7 @@
             }
 
             if (pagesData.length !== pageCount || uniqueOriginalPages.size !== pageCount) {
-                throw new Error(`Page accounting validation failed: expected ${pageCount} source pages represented exactly once, found ${uniqueOriginalPages.size}.`);
+                throw new Error(`Page accounting validation failed: expected ${pageCount} source pages represented exactly once, got entries=${pagesData.length}, uniqueOriginals=${uniqueOriginalPages.size}.`);
             }
             if ((actualLetterPages + actualLegalPages) !== pageCount) {
                 throw new Error(`Page accounting validation failed: Letter (${actualLetterPages}) + Legal (${actualLegalPages}) does not equal source count (${pageCount}).`);
@@ -764,11 +764,11 @@
                 cursorY += step;
             }
 
-            function writeWrappedText(text, width, lineHeight = 12, extraSpacing = 0, x = marginX) {
+            function writeWrappedText(text, width, lineHeight = 12, extraSpacing = 0) {
                 const wrapped = doc.splitTextToSize(text, width);
                 const required = (wrapped.length * lineHeight) + extraSpacing;
                 ensureSpace(required);
-                doc.text(wrapped, x, cursorY);
+                doc.text(wrapped, marginX, cursorY);
                 cursorY += required;
             }
 

@@ -118,12 +118,12 @@
 
             <!-- Preserve Options -->
             <div class="space-y-2 mb-4">
-                <label class="flex items-center space-x-3 cursor-pointer">
-                    <input type="radio" name="preserve" value="No" class="form-radio h-4 w-4 text-brandBlue" checked onchange="updateUIState()">
+                <label class="flex items-center space-x-3 cursor-pointer" for="preserveNo">
+                    <input type="radio" id="preserveNo" name="preserve" value="No" class="form-radio h-4 w-4 text-brandBlue" checked onchange="updateUIState()">
                     <span class="text-sm text-slate-700">No (Default)</span>
                 </label>
-                <label class="flex items-center space-x-3 cursor-pointer">
-                    <input type="radio" name="preserve" value="Yes" class="form-radio h-4 w-4 text-brandBlue" onchange="updateUIState()">
+                <label class="flex items-center space-x-3 cursor-pointer" for="preserveYes">
+                    <input type="radio" id="preserveYes" name="preserve" value="Yes" class="form-radio h-4 w-4 text-brandBlue" onchange="updateUIState()">
                     <span class="text-sm text-slate-700">Yes</span>
                 </label>
             </div>
@@ -132,12 +132,12 @@
             <div id="method-container" class="ml-6 pl-4 border-l-2 border-slate-200 opacity-50 pointer-events-none transition-opacity">
                 <p class="text-xs font-bold text-slate-800 mb-2">Placeholder Insertion Method:</p>
                 <div class="space-y-2">
-                    <label class="flex items-center space-x-3 cursor-pointer">
-                        <input type="radio" name="method" value="Exact Page Preservation" class="form-radio h-4 w-4 text-brandBlue" checked onchange="updateUIState()">
+                    <label class="flex items-center space-x-3 cursor-pointer" for="methodExact">
+                        <input type="radio" id="methodExact" name="method" value="Exact Page Preservation" class="form-radio h-4 w-4 text-brandBlue" checked onchange="updateUIState()">
                         <span class="text-sm text-slate-700">Exact Page Preservation</span>
                     </label>
-                    <label class="flex items-center space-x-3 cursor-pointer">
-                        <input type="radio" name="method" value="One Placeholder Per Legal Section" class="form-radio h-4 w-4 text-brandBlue" onchange="updateUIState()">
+                    <label class="flex items-center space-x-3 cursor-pointer" for="methodSection">
+                        <input type="radio" id="methodSection" name="method" value="One Placeholder Per Legal Section" class="form-radio h-4 w-4 text-brandBlue" onchange="updateUIState()">
                         <span class="text-sm text-slate-700">One Placeholder Per Legal Section</span>
                     </label>
                 </div>
@@ -265,12 +265,12 @@
         }
 
         function updateUIState() {
-            const preserveVal = document.querySelector('input[name="preserve"]:checked').value;
+            const isPreserveNo = document.getElementById('preserveNo').checked;
             const methodContainer = document.getElementById('method-container');
             const methodInputs = methodContainer.querySelectorAll('input');
             const explanation = document.getElementById('explanation-text');
 
-            if (preserveVal === "No") {
+            if (isPreserveNo) {
                 methodContainer.classList.add('opacity-50', 'pointer-events-none');
                 methodInputs.forEach(i => i.disabled = true);
                 explanation.innerHTML = "► The PDF will simply be split into a Legal file and a Letter file. No placeholder pages will be added.";
@@ -278,8 +278,8 @@
                 methodContainer.classList.remove('opacity-50', 'pointer-events-none');
                 methodInputs.forEach(i => i.disabled = false);
                 
-                const methodVal = document.querySelector('input[name="method"]:checked').value;
-                if (methodVal === "Exact Page Preservation") {
+                const isMethodExact = document.getElementById('methodExact').checked;
+                if (isMethodExact) {
                     explanation.innerHTML = "► A blank Letter page will be inserted into the Letter PDF for every single Legal page removed. The Letter PDF page count will match the original file.";
                 } else {
                     explanation.innerHTML = "► A single blank Letter page will be inserted into the Letter PDF just to mark the spot where a continuous group of Legal pages was removed.";
@@ -368,19 +368,23 @@
                 
                 setStatus("Analyzing structure and extracting headers...");
                 
-                // 1. Load PDF with pdf.js for text extraction (slice prevents detached ArrayBuffer error)
-                const pdfJsDoc = await pdfjsLib.getDocument({data: new Uint8Array(arrayBuffer.slice(0))}).promise;
+                // 1. Load PDF with pdf.js for text extraction
+                const pdfJsDoc = await pdfjsLib.getDocument({data: new Uint8Array(arrayBuffer).slice(0)}).promise;
                 const pageCount = pdfJsDoc.numPages;
                 
                 // 2. Load PDF with pdf-lib for structural manipulation
                 const { PDFDocument } = PDFLib;
-                const srcDoc = await PDFDocument.load(arrayBuffer.slice(0));
+                const srcDoc = await PDFDocument.load(new Uint8Array(arrayBuffer).slice(0));
                 const letterDoc = await PDFDocument.create();
                 const legalDoc = await PDFDocument.create();
                 
-                const preserveMode = document.querySelector('input[name="preserve"]:checked').value;
-                const methodMode = document.querySelector('input[name="method"]:checked').value;
-                const placeholderMode = preserveMode === "Yes" ? methodMode : "None";
+                // Robust mobile-safe state reading
+                const isPreserveYes = document.getElementById('preserveYes').checked;
+                const isMethodExact = document.getElementById('methodExact').checked;
+                
+                const placeholderMode = isPreserveYes 
+                    ? (isMethodExact ? "Exact Page Preservation" : "One Placeholder Per Legal Section") 
+                    : "None";
 
                 let pagesData = [];
                 let actualLetterPages = 0;
@@ -467,6 +471,9 @@
                 
                 setStatus("Success! Files downloaded.", false, true);
 
+                // Free memory to prevent mobile crashes
+                if (pdfJsDoc) pdfJsDoc.destroy();
+
             } catch (err) {
                 console.error(err);
                 setStatus("An error occurred during processing.", true);
@@ -490,11 +497,10 @@
                     const y = Math.round(item.transform[5] / 5) * 5;
                     
                     if (!lines[y]) {
-                        lines[y] = { text: "", maxFontSize: 0, minX: 9999, maxX: 0, isBold: false };
+                        lines[y] = { items: [], maxFontSize: 0, minX: 9999, maxX: 0, isBold: false };
                     }
                     
-                    // pdf.js coords: transform is [scaleX, skewY, skewX, scaleY, tx, ty]
-                    lines[y].text += item.str;
+                    lines[y].items.push({ text: item.str, x: item.transform[4] });
                     
                     const fontSize = item.transform[0];
                     if (fontSize > lines[y].maxFontSize) lines[y].maxFontSize = fontSize;
@@ -507,17 +513,33 @@
                 }
 
                 const centerX = pageWidth / 2.0;
-                const topBoundary = pageHeight * 0.65; // Top 35% of the page
                 
                 let bestText = "";
                 let maxScore = 0;
                 
                 for (let y in lines) {
                     const numY = parseInt(y);
-                    if (numY < topBoundary) continue; // Skip lines not in top section
+                    
+                    // Mobile & Viewport Safe: Check if physically near top (handles both standard bottom-up and inverted top-down Y origins)
+                    const isNearTopStandard = numY > (pageHeight * 0.65);
+                    const isNearTopInverted = numY < (pageHeight * 0.35);
+                    if (!isNearTopStandard && !isNearTopInverted) continue; 
                     
                     const line = lines[y];
-                    const text = line.text.trim();
+                    
+                    // Sort items by X coordinate to ensure letters are stitched in correct left-to-right order
+                    line.items.sort((a, b) => a.x - b.x);
+                    
+                    let assembledText = "";
+                    let lastX = -999;
+                    for (let item of line.items) {
+                        // Add spaces between elements if there is a significant horizontal gap
+                        if (lastX !== -999 && (item.x - lastX) > 10) assembledText += " ";
+                        assembledText += item.text;
+                        lastX = item.x + (item.text.length * (line.maxFontSize * 0.4)); // Estimate end of string
+                    }
+                    
+                    const text = assembledText.trim();
                     if (text.length < 4) continue;
                     
                     const centerDist = Math.abs(((line.minX + line.maxX) / 2.0) - centerX);
@@ -528,7 +550,9 @@
                     if (line.isBold) score *= 1.3; 
                     if (centerDist < (pageWidth * 0.15)) score *= 1.6;
                     else if (centerDist < (pageWidth * 0.30)) score *= 1.2;
-                    if (numY > pageHeight * 0.85) score *= 1.2; // very top
+                    
+                    // Bonus for being at the extreme top edge
+                    if (numY > pageHeight * 0.85 || numY < pageHeight * 0.15) score *= 1.2; 
                     
                     if (score > maxScore) {
                         maxScore = score;
@@ -538,6 +562,7 @@
                 
                 return bestText || "[No identifying header found at top of page]";
             } catch (e) {
+                console.error("Header Extraction Error:", e);
                 return "[Error reading page text]";
             }
         }

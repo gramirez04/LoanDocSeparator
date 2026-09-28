@@ -480,14 +480,14 @@
             if (finalLegalCount !== actualLegalPages) {
                 throw new Error(`Page accounting validation failed: Legal output pages (${finalLegalCount}) do not match actual Legal pages (${actualLegalPages}).`);
             }
-            if (finalLetterCount !== (actualLetterPages + placeholderCount)) {
-                throw new Error(`Page accounting validation failed: final Letter output pages (${finalLetterCount}) do not equal actual Letter pages (${actualLetterPages}) + placeholders (${placeholderCount}).`);
-            }
             if (uniqueLetterOutputPages.size !== actualLetterPages) {
                 throw new Error(`Page accounting validation failed: mapped Letter output pages (${uniqueLetterOutputPages.size}) do not match actual Letter pages (${actualLetterPages}).`);
             }
             if (uniqueLegalOutputPages.size !== actualLegalPages) {
                 throw new Error(`Page accounting validation failed: mapped Legal output pages (${uniqueLegalOutputPages.size}) do not match actual Legal pages (${actualLegalPages}).`);
+            }
+            if (finalLetterCount !== (uniqueLetterOutputPages.size + placeholderCount)) {
+                throw new Error(`Page accounting validation failed: final Letter output pages (${finalLetterCount}) do not equal mapped Letter pages (${uniqueLetterOutputPages.size}) + placeholders (${placeholderCount}).`);
             }
 
             for (let i = 0; i < pagesData.length; i++) {

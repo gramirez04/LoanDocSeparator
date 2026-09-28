@@ -579,7 +579,10 @@
                 // ==========================================
                 setStatus("Phase 2: Separating Legal and Letter pages...");
                 const { PDFDocument } = PDFLib;
-                const srcDoc = await PDFDocument.load(new Uint8Array(arrayBuffer).slice(0));
+                const srcBytes = new Uint8Array(arrayBuffer);
+                const srcDocClassify = await PDFDocument.load(srcBytes);
+                const srcDocLetter = await PDFDocument.load(srcBytes);
+                const srcDocLegal = await PDFDocument.load(srcBytes);
                 
                 const letterDoc = await PDFDocument.create();
                 const legalDoc = await PDFDocument.create();
@@ -597,7 +600,7 @@
                 const placeholderOutputPagesCreated = new Set();
 
                 for (let i = 0; i < pageCount; i++) {
-                    const srcPage = srcDoc.getPage(i);
+                    const srcPage = srcDocClassify.getPage(i);
                     const { width, height } = srcPage.getSize();
                     const pageClass = classifyPageDimensions(width, height);
                     pageClassifications.push(pageClass);
@@ -642,7 +645,7 @@
                     for (let j = runStart; j <= runEnd; j++) runIndices.push(j);
 
                     if (runIsLegal) {
-                        const copiedLegalRun = await legalDoc.copyPages(srcDoc, runIndices);
+                        const copiedLegalRun = await legalDoc.copyPages(srcDocLegal, runIndices);
                         for (let runOffset = 0; runOffset < copiedLegalRun.length; runOffset++) {
                             const pageIndex = runStart + runOffset;
                             if (builtCount % 5 === 0) setStatus(`Phase 3: Building outputs (${builtCount + 1}/${pageCount})...`);
@@ -692,7 +695,7 @@
                             builtCount++;
                         }
                     } else {
-                        const copiedLetterRun = await letterDoc.copyPages(srcDoc, runIndices);
+                        const copiedLetterRun = await letterDoc.copyPages(srcDocLetter, runIndices);
                         for (let runOffset = 0; runOffset < copiedLetterRun.length; runOffset++) {
                             const pageIndex = runStart + runOffset;
                             if (builtCount % 5 === 0) setStatus(`Phase 3: Building outputs (${builtCount + 1}/${pageCount})...`);
